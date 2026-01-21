@@ -64,3 +64,17 @@ class MarketState:
             # Should be unreachable if Timeframe enum is exhaustive for this bot
             return self
 
+    def get_series(self, timeframe: Timeframe) -> MarketSeries:
+        """Polymorphic access to series by timeframe."""
+        if timeframe == Timeframe.M5:
+            return self.m5
+        elif timeframe == Timeframe.M15:
+            return self.m15
+        elif timeframe == Timeframe.H1:
+            return self.h1
+        elif timeframe == Timeframe.H4:
+            return self.h4
+        else:
+            raise ValueError(f"Unsupported timeframe: {timeframe}")
+
+

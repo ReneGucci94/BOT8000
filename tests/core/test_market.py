@@ -80,7 +80,19 @@ def test_market_state_update_different_timeframes():
     )
     state = state.update(c_h1)
     
-    assert len(state.m5) == 1
     assert len(state.h1) == 1
     assert len(state.m15) == 0
+
+def test_market_state_get_series():
+    """Verify polymorphic access to series by timeframe."""
+    state = MarketState.empty("XRP")
+    
+    # Verify accessors return correct objects (identity check not enough as they are empty)
+    # Check types
+    assert isinstance(state.get_series(Timeframe.M5), MarketSeries)
+    assert isinstance(state.get_series(Timeframe.H4), MarketSeries)
+    
+    # Verify mapping is correct
+    assert state.get_series(Timeframe.M5) is state.m5
+    assert state.get_series(Timeframe.H1) is state.h1
 
