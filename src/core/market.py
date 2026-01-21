@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, cast
+from .candle import Candle
 from .series import MarketSeries
 from .timeframe import Timeframe
 
@@ -22,3 +23,44 @@ class MarketState:
             h1=empty_series,
             h4=empty_series
         )
+
+    def update(self, candle: Candle) -> 'MarketState':
+        """
+        Returns a NEW MarketState with the candle added to the correct series.
+        """
+        if candle.timeframe == Timeframe.M5:
+            return MarketState(
+                symbol=self.symbol,
+                m5=self.m5.add(candle),
+                m15=self.m15,
+                h1=self.h1,
+                h4=self.h4
+            )
+        elif candle.timeframe == Timeframe.M15:
+            return MarketState(
+                symbol=self.symbol,
+                m5=self.m5,
+                m15=self.m15.add(candle),
+                h1=self.h1,
+                h4=self.h4
+            )
+        elif candle.timeframe == Timeframe.H1:
+            return MarketState(
+                symbol=self.symbol,
+                m5=self.m5,
+                m15=self.m15,
+                h1=self.h1.add(candle),
+                h4=self.h4
+            )
+        elif candle.timeframe == Timeframe.H4:
+            return MarketState(
+                symbol=self.symbol,
+                m5=self.m5,
+                m15=self.m15,
+                h1=self.h1,
+                h4=self.h4.add(candle)
+            )
+        else:
+            # Should be unreachable if Timeframe enum is exhaustive for this bot
+            return self
+
