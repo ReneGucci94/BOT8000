@@ -53,7 +53,7 @@ class Backtester:
             max_drawdown=max_dd
         )
 
-    def run(self, candles: List[Candle], broker: Broker, strategy: TJRStrategy, executor: TradeExecutor) -> BacktestReport:
+    def run(self, candles: List[Candle], broker: Broker, strategy: TJRStrategy, executor: TradeExecutor, timeframe: Timeframe) -> BacktestReport:
         initial_balance = broker.get_balance()
         market = MarketState.empty("BTCUSDT") # Symbol generic for now
         total_trades = 0
@@ -72,7 +72,7 @@ class Backtester:
             # 2. Analyze & Execute
             # Only trade if no open positions
             if not broker.get_positions():
-                signal = strategy.analyze(market, Timeframe.M5)
+                signal = strategy.analyze(market, timeframe)
                 if signal:
                     result = executor.execute_trade(signal)
                     if result and result.status == "FILLED":
