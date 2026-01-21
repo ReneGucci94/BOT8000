@@ -33,8 +33,8 @@ def run_backtest_for_file(file_path: str, timeframe: Timeframe):
 
 def main():
     # SETTINGS
-    TARGET_TIMEFRAME = Timeframe.H1
-    GLO_PATTERN = "*-1h-*.csv"
+    TARGET_TIMEFRAME = Timeframe.H4
+    GLO_PATTERN = "*-4h-*.csv"
     
     print(f"--- TJR Trading Bot v2: Multi-Month Backtest ({TARGET_TIMEFRAME.value.upper()}) ---")
     data_dir = "data/raw/"
@@ -55,7 +55,9 @@ def main():
     months_profitable = 0
 
     for file_path in csv_files:
-        month_name = os.path.basename(file_path).split("-")[2] # Extract YYYY-MM
+        # Expected format: BTCUSDT-4h-2024-01.csv
+        parts = os.path.basename(file_path).split("-")
+        month_name = f"{parts[2]}-{parts[3].replace('.csv', '')}" 
         
         try:
             report, fees = run_backtest_for_file(file_path, TARGET_TIMEFRAME)
