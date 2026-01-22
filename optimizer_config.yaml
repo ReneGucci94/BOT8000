@@ -30,3 +30,7 @@ risk_percent: 0.01
 data_path: "data/raw"
 parallel: true
 checkpoint_interval: 10
+
+# Data Download Settings
+download_years: [2024]
+download_months: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]

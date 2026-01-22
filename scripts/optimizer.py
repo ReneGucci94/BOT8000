@@ -11,6 +11,7 @@ sys.path.append(os.path.abspath("src"))
 from optimization.types import OptimizerConfig
 from optimization.engine import OptimizerEngine
 from optimization.analyzer import ResultAnalyzer
+from data.downloader import download_binance_data
 
 def load_config(config_path: str) -> OptimizerConfig:
     with open(config_path, 'r') as f:
@@ -25,6 +26,8 @@ def load_config(config_path: str) -> OptimizerConfig:
         initial_balance=Decimal(str(data['initial_balance'])),
         risk_percent=Decimal(str(data['risk_percent'])),
         data_path=data['data_path'],
+        download_years=data.get('download_years', [2024]),
+        download_months=data.get('download_months', list(range(1, 13))),
         parallel=data.get('parallel', True),
         checkpoint_interval=data.get('checkpoint_interval', 10)
     )
@@ -38,6 +41,15 @@ def main():
     config = load_config(args.config)
     
     if not args.analyze:
+        # Automatic Data Download
+        download_binance_data(
+            pairs=config.pairs,
+            timeframes=config.timeframes,
+            years=config.download_years,
+            months=config.download_months,
+            data_dir=config.data_path
+        )
+        
         print(f"--- Starting Optimization ---")
         print(f"Timeframes: {config.timeframes}")
         print(f"Pairs: {config.pairs}")

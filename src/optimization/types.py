@@ -13,6 +13,8 @@ class OptimizerConfig:
     initial_balance: Decimal
     risk_percent: Decimal
     data_path: str
+    download_years: List[int]
+    download_months: List[int]
     parallel: bool = True
     checkpoint_interval: int = 10
 
