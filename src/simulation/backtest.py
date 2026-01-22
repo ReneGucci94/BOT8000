@@ -15,24 +15,35 @@ class BacktestReport:
     final_balance: Decimal
     net_profit: Decimal
     total_trades: int
+    winning_trades: int
+    losing_trades: int
     win_rate: float
+    gross_profit: Decimal
+    gross_loss: Decimal
     max_drawdown: Decimal
 
 class Backtester:
     @staticmethod
-    def calculate_report(initial_balance: Decimal, equity_curve: List[Decimal], total_trades: int) -> BacktestReport:
+    def calculate_report(initial_balance: Decimal, equity_curve: List[Decimal], trade_history: List[dict]) -> BacktestReport:
         final_balance = equity_curve[-1]
         net_profit = final_balance - initial_balance
         
-        # Win Rate calculation
-        # We assume every increase in equity curve is a win
-        # (This is a simplification, but fits the current MockBroker behavior)
-        wins = 0
-        for i in range(1, len(equity_curve)):
-            if equity_curve[i] > equity_curve[i-1]:
-                wins += 1
+        total_trades = len(trade_history)
+        winning_trades = 0
+        losing_trades = 0
+        gross_profit = Decimal("0")
+        gross_loss = Decimal("0")
         
-        win_rate = (wins / total_trades * 100) if total_trades > 0 else 0.0
+        for trade in trade_history:
+            pnl = trade.get('pnl', Decimal("0"))
+            if pnl > 0:
+                winning_trades += 1
+                gross_profit += pnl
+            else:
+                losing_trades += 1
+                gross_loss += abs(pnl)
+                
+        win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0.0
         
         # Max Drawdown calculation
         max_dd = Decimal("0")
@@ -49,7 +60,11 @@ class Backtester:
             final_balance=final_balance,
             net_profit=net_profit,
             total_trades=total_trades,
+            winning_trades=winning_trades,
+            losing_trades=losing_trades,
             win_rate=win_rate,
+            gross_profit=gross_profit,
+            gross_loss=gross_loss,
             max_drawdown=max_dd
         )
 
@@ -80,5 +95,6 @@ class Backtester:
         
         # Re-access equity curve from broker if possible
         equity_curve = getattr(broker, 'equity_curve', [broker.get_balance()])
+        trade_history = getattr(broker, 'trade_history', [])
         
-        return self.calculate_report(initial_balance, equity_curve, total_trades)
+        return self.calculate_report(initial_balance, equity_curve, trade_history)

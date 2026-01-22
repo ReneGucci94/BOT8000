@@ -1,0 +1,32 @@
+timeframes:
+  - "1h"
+  - "4h"
+
+pairs:
+  - "BTCUSDT"
+
+# Stop Losses (Fixed Amount in USD or 0 for Structural)
+# 0 = Use TJR logic (Fractal-based)
+# >0 = Use fixed distance (e.g. 500)
+stop_losses:
+  - 0     # Structural
+  - 500   # Tight
+  - 1000  # Medium
+  - 3000  # Wide
+
+take_profit_multiples:
+  - 1.5
+  - 2.0
+  - 2.5
+  - 3.0
+
+fee_rates:
+  - 0.001   # Standard 0.1%
+  - 0.0004  # VIP/BNB 0.04%
+
+initial_balance: 10000
+risk_percent: 0.01
+
+data_path: "data/raw"
+parallel: true
+checkpoint_interval: 10

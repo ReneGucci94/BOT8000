@@ -1,0 +1,13 @@
+=== OPTIMIZATION SUMMARY ===
+
+Total Configurations: 1
+Profitable Configs: 0 (0.00%)
+
+--- TOP 10 CONFIGURATIONS ---
+          config_id timeframe    pair  stop_loss  net_profit  total_trades
+cfg_0000_BTCUSDT_4h        4h BTCUSDT          0    -1039.79            41
+
+
+--- BEST BY TIMEFRAME ---
+timeframe           config_id  net_profit  win_rate  total_trades
+       4h cfg_0000_BTCUSDT_4h    -1039.79   36.5854            41

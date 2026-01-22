@@ -1,0 +1,21 @@
+timeframes:
+  - "4h"
+
+pairs:
+  - "BTCUSDT"
+
+stop_losses:
+  - 0 # Structural
+
+take_profit_multiples:
+  - 2.0
+
+fee_rates:
+  - 0.001
+
+initial_balance: 10000
+risk_percent: 0.01
+
+data_path: "data/raw"
+parallel: true
+checkpoint_interval: 1

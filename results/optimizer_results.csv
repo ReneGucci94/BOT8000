@@ -1,0 +1,2 @@
+config_id,timeframe,pair,stop_loss,take_profit_r,fee_rate,total_trades,win_rate,net_profit,max_drawdown,execution_time
+cfg_0000_BTCUSDT_4h,4h,BTCUSDT,0,2.0,0.001,41,36.5854,-1039.79,1486.83,0.2118
