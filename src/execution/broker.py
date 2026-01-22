@@ -36,6 +36,8 @@ class Position:
     quantity: Decimal
     entry_price: Decimal
     unrealized_pnl: Optional[Decimal] = None
+    stop_loss: Optional[Decimal] = None
+    take_profit: Optional[Decimal] = None
 
 class Broker(ABC):
     """Abstract interface for Broker implementations (Paper, Live, Backtest)."""

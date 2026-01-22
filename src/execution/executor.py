@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Any
 from .broker import Broker, OrderRequest, OrderResult, OrderSide, OrderType
 from .risk import RiskManager
 
@@ -14,9 +14,22 @@ class TradeSignal:
     take_profit: Decimal
 
 class TradeExecutor:
-    def __init__(self, broker: Broker, risk_manager: RiskManager):
+    def __init__(self, broker: Broker, risk_manager: RiskManager, strategy: Any = None):
         self.broker = broker
         self.risk_manager = risk_manager
+        self.strategy = strategy
+
+    def process_candle(self, candle: Any, market: Any, timeframe: Any):
+        """Standard V3 loop: update broker -> check signal -> execute."""
+        # 1. Update simulation/broker stops
+        if hasattr(self.broker, 'update_positions'):
+            self.broker.update_positions(candle.close)
+            
+        # 2. If no positions, look for new trades
+        if not self.broker.get_positions() and self.strategy:
+            signal = self.strategy.analyze(market, timeframe)
+            if signal:
+                self.execute_trade(signal)
 
     def execute_trade(self, signal: TradeSignal) -> Optional[OrderResult]:
         """
