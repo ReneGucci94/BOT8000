@@ -1,9 +1,9 @@
 from typing import Optional, List
 from decimal import Decimal
-from core.market import MarketState
-from core.timeframe import Timeframe
-from execution.executor import TradeSignal
-from execution.broker import OrderSide
+from src.core.market import MarketState
+from src.core.timeframe import Timeframe
+from src.execution.executor import TradeSignal
+from src.execution.broker import OrderSide
 from .ob import detect_ob, OrderBlock, OBType
 
 class TJRStrategy:

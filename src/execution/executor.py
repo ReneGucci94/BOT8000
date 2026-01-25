@@ -12,6 +12,7 @@ class TradeSignal:
     entry_price: Decimal
     stop_loss: Decimal
     take_profit: Decimal
+    confidence: Optional[float] = None
 
 class TradeExecutor:
     def __init__(self, broker: Broker, risk_manager: RiskManager, strategy: Any = None):

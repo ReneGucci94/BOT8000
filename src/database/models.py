@@ -21,6 +21,7 @@ class Trade(Base):
     timestamp = Column(DateTime, nullable=False)
     pair = Column(String(20), nullable=False)
     timeframe = Column(String(10), nullable=False)
+    symbol = Column(String(20), nullable=False, index=True)
     side = Column(String(10), nullable=False)
     
     # Prices
@@ -91,6 +92,7 @@ class Strategy(Base):
     
     id = Column(Integer, primary_key=True)
     strategy_id = Column(UUID(as_uuid=True), default=uuid.uuid4, unique=True, nullable=False)
+    symbol = Column(String(20), nullable=False, index=True)
     name = Column(String(100), unique=True, nullable=False)
     description = Column(Text)
     

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 from decimal import Decimal
-from core.series import MarketSeries
+from src.core.series import MarketSeries
 from .structure import detect_bos, StructureType
 from .fractals import is_valid_low, is_valid_high
 

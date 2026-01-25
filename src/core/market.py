@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import List, cast
+from dataclasses import dataclass, field
+from typing import List, cast, Dict, Any
 from .candle import Candle
 from .series import MarketSeries
 from .timeframe import Timeframe
@@ -11,6 +11,26 @@ class MarketState:
     m15: MarketSeries
     h1: MarketSeries
     h4: MarketSeries
+    _cache: Dict[str, Any] = field(default_factory=dict, init=False, repr=False)
+
+    def __post_init__(self):
+        # Use object.__setattr__ because the dataclass is frozen
+        object.__setattr__(self, '_cache', {})
+
+    @property
+    def rsi(self):
+        """Lazy cached RSI calculation (placeholder)."""
+        if 'rsi' not in self._cache:
+            # Note: In a real implementation, we would call an actual indicator lib
+            self._cache['rsi'] = calculate_rsi(self.h4)
+        return self._cache['rsi']
+
+    @property
+    def atr(self):
+        """Lazy cached ATR calculation (placeholder)."""
+        if 'atr' not in self._cache:
+            self._cache['atr'] = calculate_atr(self.h4)
+        return self._cache['atr']
 
     @classmethod
     def empty(cls, symbol: str) -> 'MarketState':
@@ -76,5 +96,15 @@ class MarketState:
             return self.h4
         else:
             raise ValueError(f"Unsupported timeframe: {timeframe}")
+
+
+def calculate_rsi(series: MarketSeries) -> List[float]:
+    """Placeholder for RSI calculation."""
+    # This will be mocked in tests or implemented with a real lib later
+    return [50.0] * len(series)
+
+def calculate_atr(series: MarketSeries) -> List[float]:
+    """Placeholder for ATR calculation."""
+    return [1.0] * len(series)
 
 

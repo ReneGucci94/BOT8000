@@ -1,4 +1,4 @@
-from core.series import MarketSeries
+from src.core.series import MarketSeries
 
 def is_valid_high(series: MarketSeries, index: int) -> bool:
     """

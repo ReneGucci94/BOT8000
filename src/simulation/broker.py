@@ -1,6 +1,6 @@
 from decimal import Decimal
-from typing import List, Optional
-from execution.broker import Broker, OrderRequest, OrderResult, Position, OrderType, OrderSide
+from typing import List, Optional, Any
+from src.execution.broker import Broker, OrderRequest, OrderResult, Position, OrderType, OrderSide
 
 class InMemoryBroker(Broker):
     """
@@ -14,26 +14,7 @@ class InMemoryBroker(Broker):
         self.equity_curve: List[Decimal] = [self._balance]
         self.total_fees_paid = Decimal("0")
         self.trade_history = []
-        
-    def get_balance(self) -> Decimal:
-        return self._balance
-
-    def place_order(self, order: OrderRequest) -> OrderResult:
-        if self._balance <= 0:
-            return OrderResult(order_id="REJECTED", status="FAILED", filled_price=Decimal("0"), filled_quantity=Decimal("0"))
-            
-        # Simulate Entry Fee
-        entry_val = order.quantity * order.price
-        fee = entry_val * self._fee_rate
-        
-        if self._balance < fee:
-            # Cannot even pay fee
-            return OrderResult(order_id="REJECTED_FEE", status="FAILED", filled_price=Decimal("0"), filled_quantity=Decimal("0"))
-            
-        self._balance -= fee
-        self.total_fees_paid = Decimal("0")
-        self.trade_history = []
-        self.closed_positions = [] # For V3 tracking
+        self.closed_positions = []
         
     def get_balance(self) -> Decimal:
         return self._balance

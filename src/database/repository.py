@@ -38,6 +38,12 @@ class TradeRepository:
         return db.query(Trade).filter(Trade.backtest_run_id == run_id).all()
     
     @staticmethod
+    def get_by_strategy_version(db: Session, strategy_version: str) -> List[Trade]:
+        """Obtener trades por versión de estrategia"""
+        return db.query(Trade).filter(Trade.strategy_version == strategy_version).all()
+
+    
+    @staticmethod
     def get_losing_trades(
         db: Session, 
         pair: Optional[str] = None,
@@ -197,8 +203,8 @@ class StrategyRepository:
         return strategy
     
     @staticmethod
-    def approve(db: Session, strategy_id: uuid.UUID) -> Optional[Strategy]:
-        """Aprobar estrategia"""
+    def approve(db: Session, strategy_id: uuid.UUID, profit_factor: Optional[float] = None, win_rate: Optional[float] = None) -> Optional[Strategy]:
+        """Aprobar estrategia con métricas finales"""
         strategy = db.query(Strategy).filter(
             Strategy.strategy_id == strategy_id
         ).first()
@@ -206,6 +212,10 @@ class StrategyRepository:
         if strategy:
             strategy.status = 'APPROVED'
             strategy.approved_at = datetime.utcnow()
+            if profit_factor is not None:
+                strategy.profit_factor = profit_factor
+            if win_rate is not None:
+                strategy.win_rate = win_rate
             db.flush()
         
         return strategy

@@ -5,6 +5,8 @@ from decimal import Decimal
 import uuid
 from datetime import datetime
 import statistics
+import pandas as pd
+import numpy as np
 
 from src.agents.base import BaseAgent
 from src.database import get_db_session
@@ -16,6 +18,16 @@ from src.execution.risk import RiskManager
 from src.execution.executor import TradeExecutor
 from src.core.market import MarketState
 from src.core.timeframe import Timeframe
+from src.ml.features import FeatureExtractor
+from src.ml.analyzer import PatternAnalyzer
+
+# Alphas
+from src.alphas.ob_quality import Alpha_OB_Quality
+from src.alphas.momentum import Alpha_Momentum
+from src.alphas.volatility import Alpha_Volatility
+from src.alphas.ml_confidence import Alpha_ML_Confidence
+from src.alphas.liquidity import Alpha_Liquidity
+from src.alphas.combiner import AlphaCombiner
 
 class OptimizerWorker(BaseAgent):
     """
@@ -27,6 +39,8 @@ class OptimizerWorker(BaseAgent):
     def __init__(self, worker_id: str):
         super().__init__(f"Worker-{worker_id}")
         self.worker_id = worker_id
+        self.feature_extractor = FeatureExtractor()
+        self._combiner: Optional[AlphaCombiner] = None
     
     def run(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -38,6 +52,33 @@ class OptimizerWorker(BaseAgent):
         year = config['year']
         months = config.get('months', list(range(1, 13)))
         backtest_run_id = config['backtest_run_id']
+        
+        # ML Config
+        use_ml = config.get('use_ml_model', False)
+        ml_model_path = config.get('ml_model_path', 'data/models/rf_model_v1.pkl')
+        ml_threshold = config.get('ml_prob_threshold', 0.6)
+        
+        analyzer = None
+        if use_ml:
+            analyzer = PatternAnalyzer(ml_model_path)
+            if not analyzer.is_trained:
+                self.log('WARNING', "ML Model requested but no trained model found. Running without ML.")
+                analyzer = None # Fallback
+            else:
+                self.log('INFO', f"Running with ML Filter (Threshold: {ml_threshold})")
+        
+        # Alpha Engine Setup (Task 6.9)
+        use_alpha_engine = config.get('use_alpha_engine', False)
+        if use_alpha_engine:
+            self.log('INFO', "Alpha Engine active for signal generation")
+            # Iniciar alphas con los pesos definidos por el usuario
+            self._combiner = AlphaCombiner([
+                (Alpha_OB_Quality(), 1.5),
+                (Alpha_Momentum(), 2.0),
+                (Alpha_Volatility(), 0.5),
+                (Alpha_ML_Confidence(analyzer=analyzer), 1.0),
+                (Alpha_Liquidity(), 0.8)
+            ])
         
         self.log('INFO', f"Starting backtest for {pair} {timeframe_str} {year}")
         
@@ -65,6 +106,29 @@ class OptimizerWorker(BaseAgent):
         total_candles = len(all_candles)
         self.log('INFO', f"Total candles to process: {total_candles}")
         
+        # Pre-compute features for performance if ML is needed or for reporting
+        # Convert candles to DataFrame for feature extraction
+        df_candles = pd.DataFrame([{
+            'timestamp': c.timestamp,
+            'open': float(c.open),
+            'high': float(c.high),
+            'low': float(c.low),
+            'close': float(c.close),
+            'volume': float(c.volume)
+        } for c in all_candles])
+        
+        # Check timestamps
+        df_candles['timestamp'] = pd.to_datetime(df_candles['timestamp'], unit='ms')
+        
+        # Calculate features
+        self.log('INFO', "Calculating features...")
+        df_features = self.feature_extractor.add_all_features(df_candles)
+        
+        # Re-align features with candles list (dropna might have removed some initial rows)
+        # We need to map candle index to feature row
+        # Simple map by timestamp
+        features_map = df_features.set_index('timestamp')
+        
         # Initialize trading components
         strategy = TJRStrategy(
             fixed_stop_loss=Decimal(str(config['stop_loss'])),
@@ -76,8 +140,9 @@ class OptimizerWorker(BaseAgent):
             fee_rate=Decimal(str(config['fee_rate']))
         )
         
+        from src.execution.risk import RiskConfig # Import needed inside or at top
         risk_manager = RiskManager(
-            risk_percent=Decimal(str(config['risk_per_trade_pct']))
+            config=RiskConfig(risk_percentage=Decimal(str(config['risk_per_trade_pct'])) / 100)
         )
         
         executor = TradeExecutor(
@@ -88,59 +153,122 @@ class OptimizerWorker(BaseAgent):
         
         market = MarketState.empty(pair)
         trades_saved = 0
+        filtered_trades = 0
+        pending_trades = []
         
         for i, candle in enumerate(all_candles):
             # Update market state
             market = market.update(candle)
             
-            # Execute worker logic (Update broker -> Analysis -> Execution)
-            executor.process_candle(candle, market, timeframe)
+            # Logic manual para poder interceptar la señal
+            if hasattr(broker, 'update_positions'):
+                broker.update_positions(candle.close)
             
-            # Check for completed trades (new implementation in broker)
+            if not broker.get_positions():
+                # Bifurcation (Task 6.9)
+                if use_alpha_engine and self._combiner:
+                    signal = self._combiner.get_signal(market, threshold=config.get('alpha_threshold', 0.6))
+                    if signal:
+                        # Para compatibilidad con executor que necesita entry_price real, no el 0.0 placeholder del combiner
+                        # Usamos el precio actual de la vela
+                        from src.execution.executor import TradeSignal as TS
+                        signal = TS(
+                            symbol=signal.symbol,
+                            side=signal.side,
+                            entry_price=candle.close,
+                            stop_loss=candle.close - (Decimal(str(config['stop_loss'])) if signal.side.value == 'BUY' else -Decimal(str(config['stop_loss']))),
+                            take_profit=candle.close + (Decimal(str(config['stop_loss'])) * Decimal(str(config['take_profit_multiplier'])) if signal.side.value == 'BUY' else -Decimal(str(config['stop_loss'])) * Decimal(str(config['take_profit_multiplier']))),
+                            confidence=signal.confidence
+                        )
+                else:
+                    signal = strategy.analyze(market, timeframe)
+                
+                if signal:
+                    is_allowed = True
+                    prob = 0.0
+                    
+                    if analyzer:
+                        # Buscamos features para esta vela
+                        ts_key = pd.to_datetime(candle.timestamp, unit='ms')
+                        if ts_key in features_map.index:
+                            feats = features_map.loc[[ts_key]]
+                            prob = analyzer.predict_proba(feats)
+                            
+                            if prob < ml_threshold:
+                                is_allowed = False
+                                filtered_trades += 1
+                                # self.log('DEBUG', f"Trade blocked by ML: Prob {prob:.2f} < {ml_threshold}")
+                        else:
+                            # Si no hay features (e.g. primeras velas), default allow or block?
+                            # Default allow suele ser mejor para evitar 0 data, pero si falta feature es riesgo.
+                            pass
+                            
+                    if is_allowed:
+                        executor.execute_trade(signal)
+            
+            # Check for completed trades
             closed_positions = broker.get_closed_positions()
             
-            if len(closed_positions) > trades_saved:
-                # Save new closed positions to DB
-                with get_db_session() as db:
-                    for position in closed_positions[trades_saved:]:
-                        # Extract market state features
-                        # Use last 50 candles for context
-                        context_candles = all_candles[max(0, i-50):i]
-                        market_state_features = self._extract_market_state(
-                            candle,
-                            context_candles
-                        )
+            # Batch Persistence Logic
+            new_closed_count = len(closed_positions)
+            if new_closed_count > trades_saved:
+                # Accumulate pending writes
+                for position in closed_positions[trades_saved:]:
+                    # Usar features pre-calculadas si existen
+                    ts_key = pd.to_datetime(candle.timestamp, unit='ms')
+                    market_features = {}
+                    
+                    if ts_key in features_map.index:
+                        # Convertir panda Series a dict
+                        market_features_series = features_map.loc[ts_key]
+                        # Handle duplicate timestamps if any (robustness)
+                        if isinstance(market_features_series, pd.DataFrame):
+                            market_features_series = market_features_series.iloc[0]
+                        market_features = market_features_series.to_dict()
+                        # Sanitize types
+                        market_features = {k: float(v) if isinstance(v, (np.float32, np.float64)) else v for k,v in market_features.items()}
+                    else:
+                        market_features = self._extract_market_state(candle, all_candles[max(0, i-50):i])
                         
-                        trade_data = {
-                            # Realistically, the timestamp of entry is better, but here we use candle.timestamp for simplicity
-                            'timestamp': datetime.fromtimestamp(candle.timestamp / 1000),
-                            'pair': pair,
-                            'timeframe': timeframe_str,
-                            'side': position.side.value,
-                            'entry_price': position.entry_price,
-                            'exit_price': position.exit_price,
-                            'stop_loss': position.stop_loss,
-                            'take_profit': position.take_profit,
-                            'result': 'WIN' if position.pnl > 0 else 'LOSS',
-                            'profit_loss': position.pnl,
-                            'profit_loss_pct': (position.pnl / (position.entry_price * position.quantity) * 100) if position.entry_price > 0 else 0,
-                            'risk_reward': float(config['take_profit_multiplier']),
-                            'market_state': market_state_features,
-                            'strategy_version': 'TJR_ML_v3_Worker',
-                            'backtest_run_id': backtest_run_id,
-                            'worker_id': self.worker_id
-                        }
-                        
-                        TradeRepository.create(db, trade_data)
-                        trades_saved += 1
+                    trade_record = {
+                        'timestamp': datetime.fromtimestamp(candle.timestamp / 1000),
+                        'pair': pair,
+                        'symbol': pair,
+                        'timeframe': timeframe_str,
+                        'side': 'LONG' if position.side.value == 'BUY' else 'SHORT',
+                        'entry_price': position.entry_price,
+                        'exit_price': position.exit_price,
+                        'stop_loss': position.stop_loss,
+                        'take_profit': position.take_profit,
+                        'result': 'WIN' if position.pnl > 0 else 'LOSS',
+                        'profit_loss': position.pnl,
+                        'profit_loss_pct': (position.pnl / (position.entry_price * position.quantity) * 100) if position.entry_price > 0 else 0,
+                        'risk_reward': float(config['take_profit_multiplier']),
+                        'market_state': market_features,
+                        'strategy_version': config.get('strategy_version', 'TJR_ML_v3_Worker'),
+                        'backtest_run_id': backtest_run_id,
+                        'worker_id': self.worker_id
+                    }
+                    pending_trades.append(trade_record)
+                
+                trades_saved = new_closed_count
             
-            # Update progress every 500 candles
-            if i % 500 == 0:
+            # Flush batch every 50 trades or if many pending
+            if len(pending_trades) >= 50:
+                self._flush_trades(pending_trades)
+                pending_trades = []
+            
+            # Update progress every 1000 candles
+            if i % 1000 == 0:
                 self.update_progress(
                     i,
                     total_candles,
-                    f"Processed {i}/{total_candles} candles, {trades_saved} trades"
+                    f"Processed {i}/{total_candles}. Saved: {trades_saved}. ML Blocked: {filtered_trades}"
                 )
+        
+        # Final Flush
+        if pending_trades:
+            self._flush_trades(pending_trades)
         
         # Final stats
         final_balance = broker.get_balance()
@@ -163,59 +291,26 @@ class OptimizerWorker(BaseAgent):
             'final_balance': float(final_balance),
             'win_rate': round(win_rate, 2),
             'profit_factor': round(float(profit_factor), 2),
-            'trades_saved_to_db': trades_saved
+            'trades_saved_to_db': trades_saved,
+            'ml_filtered_trades': filtered_trades
         }
         
-        self.log('INFO', f"Backtest completed: {total_trades} trades, win rate {win_rate:.2f}%")
+        self.log('INFO', f"Backtest finished. WinRate: {win_rate:.2f}%. ML Filtered: {filtered_trades} trades.")
         
         return result
     
     def _extract_market_state(self, current_candle, historical_candles: List) -> Dict[str, Any]:
-        """
-        Extraer features de market state para ML
-        """
-        if not historical_candles:
-            return {'error': 'no_historical_data'}
-        
-        # Price features
-        closes = [float(c.close) for c in historical_candles]
-        highs = [float(c.high) for c in historical_candles]
-        lows = [float(c.low) for c in historical_candles]
-        volumes = [float(c.volume) for c in historical_candles]
-        
-        current_price = float(current_candle.close)
-        
-        # Volatility (ATR approximation)
-        price_ranges = [h - l for h, l in zip(highs, lows)]
-        atr = statistics.mean(price_ranges[-14:]) if len(price_ranges) >= 14 else 0
-        volatility = (atr / current_price) if current_price > 0 else 0
-        
-        # Volume analysis
-        avg_volume = statistics.mean(volumes)
-        current_volume = float(current_candle.volume)
-        volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
-        
-        # Trend
-        if len(closes) >= 20:
-            sma_20 = statistics.mean(closes[-20:])
-            trend = 'bullish' if current_price > sma_20 else 'bearish'
-        else:
-            trend = 'unknown'
-        
-        # Price change
-        if len(closes) >= 2:
-            price_change = (closes[-1] - closes[-2]) / closes[-2] * 100
-        else:
-            price_change = 0
-        
-        return {
-            'price': current_price,
-            'atr': round(atr, 4),
-            'volatility': round(volatility, 4),
-            'volume': current_volume,
-            'avg_volume': round(avg_volume, 2),
-            'volume_ratio': round(volume_ratio, 2),
-            'trend': trend,
-            'price_change_pct': round(price_change, 2),
-            'candles_in_history': len(historical_candles)
-        }
+        """Legacy manual extraction (fallback)"""
+        if not historical_candles: return {}
+        # Simple extraction for fallback
+        return {'price': float(current_candle.close), 'volume': float(current_candle.volume)}
+
+    def _flush_trades(self, trades: List[Dict]):
+        """Persist a batch of trades to DB"""
+        if not trades: return
+        try:
+            with get_db_session() as db:
+                for t in trades:
+                    TradeRepository.create(db, t)
+        except Exception as e:
+            self.log('ERROR', f"Failed to flush trades batch: {str(e)}")

@@ -1,8 +1,8 @@
 import csv
 from decimal import Decimal
 from typing import List
-from core.candle import Candle
-from core.timeframe import Timeframe
+from src.core.candle import Candle
+from src.core.timeframe import Timeframe
 
 def parse_binance_line(line: str, timeframe: Timeframe) -> Candle:
     """
