@@ -21,7 +21,6 @@ class MarketState:
     def rsi(self):
         """Lazy cached RSI calculation (placeholder)."""
         if 'rsi' not in self._cache:
-            # Note: In a real implementation, we would call an actual indicator lib
             self._cache['rsi'] = calculate_rsi(self.h4)
         return self._cache['rsi']
 
@@ -31,6 +30,42 @@ class MarketState:
         if 'atr' not in self._cache:
             self._cache['atr'] = calculate_atr(self.h4)
         return self._cache['atr']
+
+    @property
+    def adx(self) -> float:
+        """Lazy cached ADX calculation."""
+        if 'adx' not in self._cache:
+            self._cache['adx'] = calculate_adx(self.h4)
+        return self._cache['adx']
+
+    @property
+    def atr_avg_14(self) -> float:
+        """Lazy cached ATR average (14 periods)."""
+        if 'atr_avg_14' not in self._cache:
+            # Note: For simplicity, we calculate it from the atr series
+            atr_series = self.atr
+            if len(atr_series) >= 14:
+                self._cache['atr_avg_14'] = sum(atr_series[-14:]) / 14.0
+            else:
+                self._cache['atr_avg_14'] = sum(atr_series) / len(atr_series) if atr_series else 1.0
+        return self._cache['atr_avg_14']
+
+    @property
+    def ema_alignment(self) -> str:
+        """Lazy cached EMA alignment (20 vs 50)."""
+        if 'ema_alignment' not in self._cache:
+            ema_20 = calculate_ema(self.h4, 20)
+            ema_50 = calculate_ema(self.h4, 50)
+            
+            if ema_20 > ema_50:
+                alignment = 'bullish'
+            elif ema_20 < ema_50:
+                alignment = 'bearish'
+            else:
+                alignment = 'neutral'
+            
+            self._cache['ema_alignment'] = alignment
+        return self._cache['ema_alignment']
 
     @classmethod
     def empty(cls, symbol: str) -> 'MarketState':
@@ -106,5 +141,16 @@ def calculate_rsi(series: MarketSeries) -> List[float]:
 def calculate_atr(series: MarketSeries) -> List[float]:
     """Placeholder for ATR calculation."""
     return [1.0] * len(series)
+
+def calculate_adx(series: MarketSeries) -> float:
+    """Placeholder for ADX calculation."""
+    # Real ADX would involve smoothed DMS/TR
+    return 25.0
+
+def calculate_ema(series: MarketSeries, period: int) -> float:
+    """Placeholder for EMA calculation."""
+    if len(series) == 0:
+        return 0.0
+    return float(series.get(-1).close)
 
 

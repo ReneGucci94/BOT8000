@@ -42,8 +42,9 @@ class InMemoryBroker(Broker):
             quantity=order.quantity,
             entry_price=order.price,
             unrealized_pnl=Decimal("0"),
-            stop_loss=order.stop_loss, # Added for V3
-            take_profit=order.take_profit # Added for V3
+            stop_loss=order.stop_loss,
+            take_profit=order.take_profit,
+            metadata=order.metadata
         )
         self.positions.append(pos)
         

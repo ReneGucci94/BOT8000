@@ -28,6 +28,7 @@ from src.alphas.volatility import Alpha_Volatility
 from src.alphas.ml_confidence import Alpha_ML_Confidence
 from src.alphas.liquidity import Alpha_Liquidity
 from src.alphas.combiner import AlphaCombiner
+from src.agents.orchestrator import MSCOrchestrator
 
 class OptimizerWorker(BaseAgent):
     """
@@ -79,6 +80,13 @@ class OptimizerWorker(BaseAgent):
                 (Alpha_ML_Confidence(analyzer=analyzer), 1.0),
                 (Alpha_Liquidity(), 0.8)
             ])
+        
+        # MSC Orchestrator Setup (Task 8.5)
+        use_msc = config.get('use_msc', False)
+        orchestrator = None
+        if use_msc:
+            self.log('INFO', "MSC Orchestrator active (Layer 1 Brain)")
+            orchestrator = MSCOrchestrator()
         
         self.log('INFO', f"Starting backtest for {pair} {timeframe_str} {year}")
         
@@ -165,25 +173,34 @@ class OptimizerWorker(BaseAgent):
                 broker.update_positions(candle.close)
             
             if not broker.get_positions():
-                # Bifurcation (Task 6.9)
-                if use_alpha_engine and self._combiner:
+                # Bifurcation (Task 8.5)
+                signal = None
+                if use_msc and orchestrator:
+                    signal = orchestrator.get_signal(market)
+                elif use_alpha_engine and self._combiner:
                     signal = self._combiner.get_signal(market, threshold=config.get('alpha_threshold', 0.6))
-                    if signal:
-                        # Para compatibilidad con executor que necesita entry_price real, no el 0.0 placeholder del combiner
-                        # Usamos el precio actual de la vela
+                else:
+                    signal = strategy.analyze(market, timeframe)
+                
+                # Check for signal validity and normalize for execution
+                if signal:
+                    # In case of MSC/Alpha, we might have 0.0 placeholders or need Decimal conversion
+                    # For signals coming from MSC/Alpha, we overrideSL/TP/Price with current candle data
+                    # unless it's already properly set (Compatibility layer)
+                    if hasattr(signal, 'metadata') or signal.entry_price == 0.0:
                         from src.execution.executor import TradeSignal as TS
+                        # Create actual execution signal based on current candle price
+                        # Note: We keep the same side and confidence, but provide real prices
                         signal = TS(
                             symbol=signal.symbol,
                             side=signal.side,
                             entry_price=candle.close,
                             stop_loss=candle.close - (Decimal(str(config['stop_loss'])) if signal.side.value == 'BUY' else -Decimal(str(config['stop_loss']))),
                             take_profit=candle.close + (Decimal(str(config['stop_loss'])) * Decimal(str(config['take_profit_multiplier'])) if signal.side.value == 'BUY' else -Decimal(str(config['stop_loss'])) * Decimal(str(config['take_profit_multiplier']))),
-                            confidence=signal.confidence
+                            confidence=signal.confidence,
+                            metadata=getattr(signal, 'metadata', None)
                         )
-                else:
-                    signal = strategy.analyze(market, timeframe)
-                
-                if signal:
+                    
                     is_allowed = True
                     prob = 0.0
                     
@@ -245,9 +262,12 @@ class OptimizerWorker(BaseAgent):
                         'profit_loss_pct': (position.pnl / (position.entry_price * position.quantity) * 100) if position.entry_price > 0 else 0,
                         'risk_reward': float(config['take_profit_multiplier']),
                         'market_state': market_features,
-                        'strategy_version': config.get('strategy_version', 'TJR_ML_v3_Worker'),
+                        'strategy_version': config.get('strategy_version', 'MSC_v1_Worker' if use_msc else 'TJR_ML_v3_Worker'),
                         'backtest_run_id': backtest_run_id,
-                        'worker_id': self.worker_id
+                        'worker_id': self.worker_id,
+                        # Layer 1 Metrics (Task 8.5)
+                        'agent_name': position.metadata.get('agent', 'Legacy') if hasattr(position, 'metadata') and position.metadata else 'Legacy',
+                        'market_regime': position.metadata.get('regime', 'Unknown') if hasattr(position, 'metadata') and position.metadata else 'Unknown'
                     }
                     pending_trades.append(trade_record)
                 
@@ -281,6 +301,18 @@ class OptimizerWorker(BaseAgent):
         total_loss = abs(sum(p.pnl for p in closed_positions if p.pnl < 0))
         profit_factor = (total_profit / total_loss) if total_loss > 0 else 0
         
+        # Max Drawdown (Task 8.6)
+        equity_curve = broker.equity_curve
+        max_drawdown = 0.0
+        if equity_curve:
+            peak = equity_curve[0]
+            for val in equity_curve:
+                if val > peak:
+                    peak = val
+                drawdown = (peak - val) / peak
+                if drawdown > max_drawdown:
+                    max_drawdown = float(drawdown)
+        
         result = {
             'pair': pair,
             'timeframe': timeframe_str,
@@ -291,6 +323,7 @@ class OptimizerWorker(BaseAgent):
             'final_balance': float(final_balance),
             'win_rate': round(win_rate, 2),
             'profit_factor': round(float(profit_factor), 2),
+            'max_drawdown_pct': round(max_drawdown * 100, 2),
             'trades_saved_to_db': trades_saved,
             'ml_filtered_trades': filtered_trades
         }

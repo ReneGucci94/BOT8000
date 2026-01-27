@@ -43,6 +43,8 @@ class Trade(Base):
     strategy_version = Column(String(50), nullable=False)
     backtest_run_id = Column(UUID(as_uuid=True), nullable=False)
     worker_id = Column(String(50))
+    agent_name = Column(String(50))
+    market_regime = Column(String(50))
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)

@@ -3349,3 +3349,16 @@ Claude ya sabe muchas cosas. No expliques conceptos básicos de programación, f
 ---
 
 *Este documento es la guía oficial de Anthropic. Cuando crees skills, esta es la referencia autoritativa. Las skills de Superpowers siguen estos principios y los extienden con disciplina adicional.*
+
+## Regla Extra: Memoria de Errores
+
+Cuando algo falle:
+
+1. Arregla el código
+2. Actualiza el plan/doc diciendo: "Aprendí que X causa error Y"
+3. Nunca cometas el mismo error dos veces
+
+Ejemplo:
+En docs/plans/alpha-engine.md agrega:
+- ❌ Error: API X no acepta límite > 100
+- ✅ Solución: Usar límite de 50

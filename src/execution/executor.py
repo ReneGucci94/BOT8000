@@ -13,6 +13,7 @@ class TradeSignal:
     stop_loss: Decimal
     take_profit: Decimal
     confidence: Optional[float] = None
+    metadata: Optional[dict] = None
 
 class TradeExecutor:
     def __init__(self, broker: Broker, risk_manager: RiskManager, strategy: Any = None):
@@ -64,7 +65,8 @@ class TradeExecutor:
             quantity=quantity,
             price=signal.entry_price,
             stop_loss=signal.stop_loss,
-            take_profit=signal.take_profit
+            take_profit=signal.take_profit,
+            metadata=signal.metadata
         )
         
         # Place Order

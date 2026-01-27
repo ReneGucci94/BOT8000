@@ -21,6 +21,7 @@ class OrderRequest:
     price: Optional[Decimal] = None
     stop_loss: Optional[Decimal] = None
     take_profit: Optional[Decimal] = None
+    metadata: Optional[dict] = None
 
 @dataclass(frozen=True)
 class OrderResult:
@@ -38,6 +39,7 @@ class Position:
     unrealized_pnl: Optional[Decimal] = None
     stop_loss: Optional[Decimal] = None
     take_profit: Optional[Decimal] = None
+    metadata: Optional[dict] = None
 
 class Broker(ABC):
     """Abstract interface for Broker implementations (Paper, Live, Backtest)."""
