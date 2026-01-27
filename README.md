@@ -327,7 +327,11 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 - GitHub: [@feux](https://github.com/feux)
 - Website: [feux.mx](https://feux.mx)
+## 🎬 Demo Video
 
+[![BOT8000 Demo](https://youtu.be/w8o_ZQy0rD4)
+
+*30-second overview of the multi-agent architecture*
 ---
 
 <p align="center">
