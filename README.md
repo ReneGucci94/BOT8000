@@ -53,7 +53,7 @@ BOT8000 implements the **Pure Alpha** philosophy: instead of searching for a sin
                     │                               │
             ┌───────▼───────┐               ┌───────▼───────┐
             │  Risk Manager │               │ Trade Executor│
-            │ (Position Size)│               │  (Simulation) │
+            │(Position Size)│               │  (Simulation) │
             └───────────────┘               └───────────────┘
 ```
 
