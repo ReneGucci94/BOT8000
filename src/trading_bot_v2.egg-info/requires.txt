@@ -1,0 +1,9 @@
+pandas
+requests
+python-dotenv
+
+[dev]
+pytest
+mypy
+ruff
+types-requests

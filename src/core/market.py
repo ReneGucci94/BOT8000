@@ -1,5 +1,10 @@
+
 from dataclasses import dataclass, field
 from typing import List, cast, Dict, Any
+import pandas as pd
+from ta.momentum import RSIIndicator
+from ta.volatility import AverageTrueRange
+from ta.trend import ADXIndicator, EMAIndicator
 from .candle import Candle
 from .series import MarketSeries
 from .timeframe import Timeframe
@@ -133,24 +138,50 @@ class MarketState:
             raise ValueError(f"Unsupported timeframe: {timeframe}")
 
 
-def calculate_rsi(series: MarketSeries) -> List[float]:
-    """Placeholder for RSI calculation."""
-    # This will be mocked in tests or implemented with a real lib later
-    return [50.0] * len(series)
+def calculate_rsi(series: MarketSeries, period: int = 14) -> List[float]:
+    """Real RSI calculation using ta library."""
+    if len(series) < period:
+        return [50.0] * len(series)  # Not enough data
+    
+    closes = pd.Series([c.close for c in series]).astype(float)
+    rsi = RSIIndicator(closes, window=period)
+    return rsi.rsi().fillna(50.0).tolist()
 
-def calculate_atr(series: MarketSeries) -> List[float]:
-    """Placeholder for ATR calculation."""
-    return [1.0] * len(series)
+def calculate_atr(series: MarketSeries, period: int = 14) -> List[float]:
+    """Real ATR calculation using ta library."""
+    if len(series) < period:
+        return [1.0] * len(series)
+    
+    highs = pd.Series([c.high for c in series]).astype(float)
+    lows = pd.Series([c.low for c in series]).astype(float)
+    closes = pd.Series([c.close for c in series]).astype(float)
+    
+    atr = AverageTrueRange(highs, lows, closes, window=period)
+    return atr.average_true_range().fillna(1.0).tolist()
 
-def calculate_adx(series: MarketSeries) -> float:
-    """Placeholder for ADX calculation."""
-    # Real ADX would involve smoothed DMS/TR
-    return 25.0
+def calculate_adx(series: MarketSeries, period: int = 14) -> float:
+    """Real ADX calculation using ta library."""
+    if len(series) < period * 2:
+        return 20.0  # Not enough data
+    
+    highs = pd.Series([c.high for c in series]).astype(float)
+    lows = pd.Series([c.low for c in series]).astype(float)
+    closes = pd.Series([c.close for c in series]).astype(float)
+    
+    adx = ADXIndicator(highs, lows, closes, window=period)
+    result = adx.adx().iloc[-1]
+    
+    return float(result) if not pd.isna(result) else 20.0
 
 def calculate_ema(series: MarketSeries, period: int) -> float:
-    """Placeholder for EMA calculation."""
-    if len(series) == 0:
-        return 0.0
-    return float(series.get(-1).close)
+    """Real EMA calculation using ta library."""
+    if len(series) < period:
+        return float(series.get(-1).close) if len(series) > 0 else 0.0
+    
+    closes = pd.Series([c.close for c in series]).astype(float)
+    ema = EMAIndicator(closes, window=period)
+    result = ema.ema_indicator().iloc[-1]
+    
+    return float(result) if not pd.isna(result) else float(closes.iloc[-1])
 
 

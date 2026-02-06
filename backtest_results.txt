@@ -1,0 +1,251 @@
+[Worker-legacy] 2026-02-04 20:19:36,001 - INFO - Starting backtest for BTCUSDT 4h 2024
+[Worker-legacy] 2026-02-04 20:19:36,078 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-legacy] 2026-02-04 20:19:36,090 - INFO - Total candles to process: 2196
+[Worker-legacy] 2026-02-04 20:19:36,092 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-legacy] 2026-02-04 20:19:36,096 - INFO - Calculating features...
+[Worker-legacy] 2026-02-04 20:19:36,098 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-legacy] 2026-02-04 20:19:36,106 - INFO - Progress: 0.0% - Processed 0/2196. Saved: 0. ML Blocked: 0
+[Worker-legacy] 2026-02-04 20:19:36,108 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-legacy] 2026-02-04 20:19:36,224 - INFO - Progress: 45.54% - Processed 1000/2196. Saved: 28. ML Blocked: 0
+[Worker-legacy] 2026-02-04 20:19:36,227 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-legacy] 2026-02-04 20:19:36,377 - ERROR - Failed to flush trades batch: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-legacy] 2026-02-04 20:19:36,380 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-legacy] 2026-02-04 20:19:36,472 - INFO - Progress: 91.07% - Processed 2000/2196. Saved: 58. ML Blocked: 0
+[Worker-legacy] 2026-02-04 20:19:36,475 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-legacy] 2026-02-04 20:19:36,520 - ERROR - Failed to flush trades batch: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-legacy] 2026-02-04 20:19:36,522 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-legacy] 2026-02-04 20:19:36,522 - INFO - Backtest finished. WinRate: 33.33%. ML Filtered: 0 trades.
+[Worker-legacy] 2026-02-04 20:19:36,524 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-alpha] 2026-02-04 20:19:36,524 - INFO - Alpha Engine active for signal generation
+[Worker-alpha] 2026-02-04 20:19:36,526 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-alpha] 2026-02-04 20:19:36,526 - INFO - Starting backtest for BTCUSDT 4h 2024
+[Worker-alpha] 2026-02-04 20:19:36,528 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-alpha] 2026-02-04 20:19:36,535 - INFO - Total candles to process: 2196
+[Worker-alpha] 2026-02-04 20:19:36,537 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-alpha] 2026-02-04 20:19:36,541 - INFO - Calculating features...
+[Worker-alpha] 2026-02-04 20:19:36,543 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-alpha] 2026-02-04 20:19:36,550 - INFO - Progress: 0.0% - Processed 0/2196. Saved: 0. ML Blocked: 0
+[Worker-alpha] 2026-02-04 20:19:36,552 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-alpha] 2026-02-04 20:19:37,049 - INFO - Progress: 45.54% - Processed 1000/2196. Saved: 39. ML Blocked: 0
+[Worker-alpha] 2026-02-04 20:19:37,052 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-alpha] 2026-02-04 20:19:37,322 - ERROR - Failed to flush trades batch: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-alpha] 2026-02-04 20:19:37,324 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-alpha] 2026-02-04 20:19:38,179 - INFO - Progress: 91.07% - Processed 2000/2196. Saved: 83. ML Blocked: 0
+[Worker-alpha] 2026-02-04 20:19:38,182 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-alpha] 2026-02-04 20:19:38,798 - ERROR - Failed to flush trades batch: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-alpha] 2026-02-04 20:19:38,800 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-alpha] 2026-02-04 20:19:38,800 - INFO - Backtest finished. WinRate: 41.24%. ML Filtered: 0 trades.
+[Worker-alpha] 2026-02-04 20:19:38,802 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-msc] 2026-02-04 20:19:38,802 - INFO - MSC Orchestrator active (Layer 1 Brain)
+[Worker-msc] 2026-02-04 20:19:38,804 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-msc] 2026-02-04 20:19:38,804 - INFO - Starting backtest for BTCUSDT 4h 2024
+[Worker-msc] 2026-02-04 20:19:38,806 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-msc] 2026-02-04 20:19:38,814 - INFO - Total candles to process: 2196
+[Worker-msc] 2026-02-04 20:19:38,816 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-msc] 2026-02-04 20:19:38,820 - INFO - Calculating features...
+[Worker-msc] 2026-02-04 20:19:38,822 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-msc] 2026-02-04 20:19:38,829 - INFO - Progress: 0.0% - Processed 0/2196. Saved: 0. ML Blocked: 0
+[Worker-msc] 2026-02-04 20:19:38,831 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-msc] 2026-02-04 20:19:46,179 - INFO - Progress: 45.54% - Processed 1000/2196. Saved: 23. ML Blocked: 0
+[Worker-msc] 2026-02-04 20:19:46,183 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-msc] 2026-02-04 20:20:01,531 - INFO - Progress: 91.07% - Processed 2000/2196. Saved: 48. ML Blocked: 0
+[Worker-msc] 2026-02-04 20:20:01,537 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-msc] 2026-02-04 20:20:01,734 - ERROR - Failed to flush trades batch: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-msc] 2026-02-04 20:20:01,736 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-msc] 2026-02-04 20:20:05,005 - ERROR - Failed to flush trades batch: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-msc] 2026-02-04 20:20:05,007 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Worker-msc] 2026-02-04 20:20:05,007 - INFO - Backtest finished. WinRate: 45.28%. ML Filtered: 0 trades.
+[Worker-msc] 2026-02-04 20:20:05,010 - ERROR - Error logging to DB: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+=== Test 1: Legacy TJR ===
+
+=== Test 2: Alpha Engine ===
+
+=== Test 3: MSC Orchestrator ===
+
+============================================================
+COMPARACIÓN DE SISTEMAS (2024 COMPLETO)
+============================================================
+Sistema              | Trades   | WinRate    | PF     | Balance      | MaxDD   
+---------------------------------------------------------------------------
+LEGACY               | 72       | 33.3%      | 0.94   | $9,429.71    | 9.2%
+ALPHA                | 97       | 41.2%      | 1.30   | $11,618.09   | 5.9%
+MSC                  | 53       | 45.3%      | 1.56   | $11,584.19   | 9.4%
+============================================================
+
+✓ Full system validation PASSED
