@@ -104,12 +104,19 @@ Fitness = 0.25*ScoreSub + 0.75*ScoreVal - OverfitPenalty - RegPenalty
 - [ ] Accept initial_balance parameter
 - [ ] Parametrize alpha weights
 - [ ] Parametrize classifier thresholds
-- [ ] Parametrize SL/TP multipliers
+- [x] **Phase 3: Core Integration**
+  - [x] Modify Worker & Orchestrator to accept params.
+  - [x] Dynamic SL/TP and Logic thresholds.
+  - [x] Integration Tests (Worker).
 
 ### Orchestrator Integration
 
 - [ ] Make alpha_threshold dynamic
 - [ ] Pass params from WFO to Worker
+
+## 4. Performance & Metrics
+
+(To be populated after first full WFO run)
 
 ### Tests
 

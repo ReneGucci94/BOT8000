@@ -137,14 +137,16 @@ Total: 15 checks passing
 
 ### Fecha: 2026-02-06
 
-### Objetivos:
+### Objetivos
+
 - ✅ Mock de backtester para tests
 - ✅ Integration test single window
 - ✅ Integration test multiple windows
 - ✅ Verificar rechazo de candidatos malos
 - ✅ Verificar convergencia del GA
 
-### Completado:
+### Completado
+
 - mock_backtest() - Simulador de métricas
 - test_integration_single_window_optimization() - End-to-end de 1 window
 - test_integration_multiple_windows() - WFO simulado con 3 windows
@@ -152,36 +154,52 @@ Total: 15 checks passing
 - test_integration_ga_converges_to_better_params() - Convergencia
 - 5 integration tests
 
-### Tests Status:
+### Tests Status
+
 ```
 tests/optimization/test_integration.py: 5 passed
 
 Total WFO tests: 50 passed (45 unit + 5 integration)
 ```
 
-### Decisiones de Diseño:
+### Decisiones de Diseño
+
 1. Mock backtest penaliza distancia a defaults (params buenos = defaults)
 2. Single window test usa config reducido (16 pop, 5 gen) para velocidad
 3. Multiple windows test solo 3 windows (no 8) para test rápido
 4. Integration tests verifican flujo completo sin dependencia de Worker real
 
-### Flujo Integrado:
+### Flujo Integrado
+
 ```
 Window → Split (Sub/Val) → GA optimiza → Backtest en Test → Métricas
 ```
 
-### Mock Backtest:
+### Mock Backtest
+
 - Params cerca de defaults → métricas altas
 - Params lejos de defaults → métricas bajas
 - Permite testing sin Worker real
 
-### Tiempo Real:
+### Tiempo Real
+
 - Estimado: 3-4 horas
 - Real: 1 hora
 
-### Siguiente:
-**Día 6-7/14 - Worker Integration**
-- Modificar Worker para aceptar params
+## Day 6-7: Core System Integration
+
+- **Date**: 2024-05-27
+- **Objectives**: Integrate WFO parameters into Worker, Orchestrator, and Classifier.
+- **Actions**:
+  - Modified `src/core/classifier.py` to accept dynamic thresholds for ADX and ATR.
+  - Updated `src/agents/orchestrator.py` to implement `decide` method for Weighted Alpha Blending using WFO params.
+  - Updated `src/agents/worker.py` to:
+    - Process `warmup_data` for indicator initialization.
+    - Pass `params` to Orchestrator.
+    - Implement dynamic SL/TP calculation (ATR-based) using WFO multipliers `stop_loss_atr_mult` and `take_profit_r_mult`.
+  - Created `tests/optimization/test_worker_integration.py` to verify end-to-end parameter injection.
+- **Outcome**: All tests passed. The Worker now dynamically adapts its logic based on optimized parameters.
+- **Next Steps**: Full System Verification (Day 8). Modificar Worker para aceptar params
 - Modificar Orchestrator para ser parametrizable
 - Modificar Classifier con thresholds dinámicos
 - Integrar warmup en Worker

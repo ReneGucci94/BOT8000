@@ -42,13 +42,22 @@ class OptimizerWorker(BaseAgent):
         self.worker_id = worker_id
         self.feature_extractor = FeatureExtractor()
         self._combiner: Optional[AlphaCombiner] = None
+        self.db_failures = 0
     
-    def run(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def run(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """
         Ejecutar backtest y guardar trades en DB
+        
+        Args:
+            config: Base configuration
+            **kwargs: Overrides/Additional params (params, warmup_data, initial_balance, etc.)
         """
-        pair = config['pair']
-        timeframe_str = config['timeframe']
+        # Merge kwargs into config (kwargs take precedence)
+        config = {**config, **kwargs}
+        
+        pair = config.get('pair', 'BTCUSDT') # Default for safety
+        timeframe_str = config.get('timeframe', '4h')
+
         timeframe = Timeframe(timeframe_str)
         year = config['year']
         months = config.get('months', list(range(1, 13)))
@@ -144,7 +153,7 @@ class OptimizerWorker(BaseAgent):
         )
         
         broker = InMemoryBroker(
-            balance=Decimal(str(config['initial_balance'])),
+            balance=Decimal(str(config.get('initial_balance', config['initial_balance']))),
             fee_rate=Decimal(str(config['fee_rate']))
         )
         
@@ -160,9 +169,24 @@ class OptimizerWorker(BaseAgent):
         )
         
         market = MarketState.empty(pair)
+        
+        # --- Warmup Phase (Task 6.9/WFO) ---
+        warmup_data = config.get('warmup_data', [])
+        if warmup_data:
+            self.log('INFO', f"Warming up with {len(warmup_data)} candles...")
+            for w_candle in warmup_data:
+                market = market.update(w_candle)
+                
+                # Update Broker positions during warmup if needed (usually just price update)
+                if hasattr(broker, 'update_positions'):
+                    broker.update_positions(w_candle.close)
+                    
         trades_saved = 0
         filtered_trades = 0
         pending_trades = []
+        
+        # Extract WFO params if present
+        wfo_params = config.get('params')
         
         for i, candle in enumerate(all_candles):
             # Update market state
@@ -176,7 +200,8 @@ class OptimizerWorker(BaseAgent):
                 # Bifurcation (Task 8.5)
                 signal = None
                 if use_msc and orchestrator:
-                    signal = orchestrator.get_signal(market)
+                    # Use decide() with params
+                    signal = orchestrator.decide(market, params=wfo_params)
                 elif use_alpha_engine and self._combiner:
                     signal = self._combiner.get_signal(market, threshold=config.get('alpha_threshold', 0.6))
                 else:
@@ -189,95 +214,125 @@ class OptimizerWorker(BaseAgent):
                     # unless it's already properly set (Compatibility layer)
                     if hasattr(signal, 'metadata') or signal.entry_price == 0.0:
                         from src.execution.executor import TradeSignal as TS
+                        
+                        entry_price = candle.close
+                        
+                        # --- Dynamic SL/TP Calculation (WFO) ---
+                        if wfo_params:
+                            atr_mult = float(wfo_params.get('stop_loss_atr_mult', 1.5))
+                            tp_r_mult = float(wfo_params.get('take_profit_r_mult', 2.0))
+                            
+                            # Get ATR
+                            current_atr = market.atr[-1] if market.atr else 0.0
+                            if current_atr == 0.0:
+                                 # Fallback if ATR not ready
+                                 sl_dist = Decimal(str(config['stop_loss']))
+                            else:
+                                 sl_dist = Decimal(str(current_atr)) * Decimal(str(atr_mult))
+                                 
+                            tp_dist = sl_dist * Decimal(str(tp_r_mult))
+                            
+                        else:
+                            # Legacy Fixed Logic
+                            sl_dist = Decimal(str(config['stop_loss']))
+                            tp_dist = sl_dist * Decimal(str(config['take_profit_multiplier']))
+                        
+                        if signal.side.value == 'BUY':
+                            stop_loss = entry_price - sl_dist
+                            take_profit = entry_price + tp_dist
+                        else:
+                            stop_loss = entry_price + sl_dist
+                            take_profit = entry_price - tp_dist
+                            
                         # Create actual execution signal based on current candle price
                         # Note: We keep the same side and confidence, but provide real prices
                         signal = TS(
                             symbol=signal.symbol,
                             side=signal.side,
-                            entry_price=candle.close,
-                            stop_loss=candle.close - (Decimal(str(config['stop_loss'])) if signal.side.value == 'BUY' else -Decimal(str(config['stop_loss']))),
-                            take_profit=candle.close + (Decimal(str(config['stop_loss'])) * Decimal(str(config['take_profit_multiplier'])) if signal.side.value == 'BUY' else -Decimal(str(config['stop_loss'])) * Decimal(str(config['take_profit_multiplier']))),
+                            entry_price=entry_price,
+                            stop_loss=stop_loss,
+                            take_profit=take_profit,
                             confidence=signal.confidence,
                             metadata=getattr(signal, 'metadata', None)
                         )
-                    
-                    is_allowed = True
-                    prob = 0.0
-                    
-                    if analyzer:
-                        # Buscamos features para esta vela
-                        ts_key = pd.to_datetime(candle.timestamp, unit='ms')
-                        if ts_key in features_map.index:
-                            feats = features_map.loc[[ts_key]]
-                            prob = analyzer.predict_proba(feats)
-                            
-                            if prob < ml_threshold:
-                                is_allowed = False
-                                filtered_trades += 1
-                                # self.log('DEBUG', f"Trade blocked by ML: Prob {prob:.2f} < {ml_threshold}")
-                        else:
-                            # Si no hay features (e.g. primeras velas), default allow or block?
-                            # Default allow suele ser mejor para evitar 0 data, pero si falta feature es riesgo.
-                            pass
-                            
-                    if is_allowed:
-                        executor.execute_trade(signal)
-            
-            # Check for completed trades
-            closed_positions = broker.get_closed_positions()
-            
-            # Batch Persistence Logic
-            new_closed_count = len(closed_positions)
-            if new_closed_count > trades_saved:
-                # Accumulate pending writes
-                for position in closed_positions[trades_saved:]:
-                    # Usar features pre-calculadas si existen
-                    ts_key = pd.to_datetime(candle.timestamp, unit='ms')
-                    market_features = {}
-                    
-                    if ts_key in features_map.index:
-                        # Convertir panda Series a dict
-                        market_features_series = features_map.loc[ts_key]
-                        # Handle duplicate timestamps if any (robustness)
-                        if isinstance(market_features_series, pd.DataFrame):
-                            market_features_series = market_features_series.iloc[0]
-                        market_features = market_features_series.to_dict()
-                        # Sanitize types
-                        market_features = {k: float(v) if isinstance(v, (np.float32, np.float64)) else v for k,v in market_features.items()}
-                    else:
-                        market_features = self._extract_market_state(candle, all_candles[max(0, i-50):i])
                         
-                    trade_record = {
-                        'timestamp': datetime.fromtimestamp(candle.timestamp / 1000),
-                        'pair': pair,
-                        'symbol': pair,
-                        'timeframe': timeframe_str,
-                        'side': 'LONG' if position.side.value == 'BUY' else 'SHORT',
-                        'entry_price': position.entry_price,
-                        'exit_price': position.exit_price,
-                        'stop_loss': position.stop_loss,
-                        'take_profit': position.take_profit,
-                        'result': 'WIN' if position.pnl > 0 else 'LOSS',
-                        'profit_loss': position.pnl,
-                        'profit_loss_pct': (position.pnl / (position.entry_price * position.quantity) * 100) if position.entry_price > 0 else 0,
-                        'risk_reward': float(config['take_profit_multiplier']),
-                        'market_state': market_features,
-                        'strategy_version': config.get('strategy_version', 'MSC_v1_Worker' if use_msc else 'TJR_ML_v3_Worker'),
-                        'backtest_run_id': backtest_run_id,
-                        'worker_id': self.worker_id,
-                        # Layer 1 Metrics (Task 8.5)
-                        'agent_name': position.metadata.get('agent', 'Legacy') if hasattr(position, 'metadata') and position.metadata else 'Legacy',
-                        'market_regime': position.metadata.get('regime', 'Unknown') if hasattr(position, 'metadata') and position.metadata else 'Unknown'
-                    }
-                    pending_trades.append(trade_record)
+                        is_allowed = True
+                        prob = 0.0
+                        
+                        if analyzer:
+                            # Buscamos features para esta vela
+                            ts_key = pd.to_datetime(candle.timestamp, unit='ms')
+                            if ts_key in features_map.index:
+                                feats = features_map.loc[[ts_key]]
+                                prob = analyzer.predict_proba(feats)
+                                
+                                if prob < ml_threshold:
+                                    is_allowed = False
+                                    filtered_trades += 1
+                                    # self.log('DEBUG', f"Trade blocked by ML: Prob {prob:.2f} < {ml_threshold}")
+                            else:
+                                # Si no hay features (e.g. primeras velas), default allow or block?
+                                # Default allow suele ser mejor para evitar 0 data, pero si falta feature es riesgo.
+                                pass
+                                
+                        if is_allowed:
+                            executor.execute_trade(signal)
                 
-                trades_saved = new_closed_count
-            
-            # Flush batch every 50 trades or if many pending
-            if len(pending_trades) >= 50:
-                self._flush_trades(pending_trades)
-                pending_trades = []
-            
+                # Check for completed trades
+                closed_positions = broker.get_closed_positions()
+                
+                # Batch Persistence Logic
+                new_closed_count = len(closed_positions)
+                if new_closed_count > trades_saved:
+                    # Accumulate pending writes
+                    for position in closed_positions[trades_saved:]:
+                        # Usar features pre-calculadas si existen
+                        ts_key = pd.to_datetime(candle.timestamp, unit='ms')
+                        market_features = {}
+                        
+                        if ts_key in features_map.index:
+                            # Convertir panda Series a dict
+                            market_features_series = features_map.loc[ts_key]
+                            # Handle duplicate timestamps if any (robustness)
+                            if isinstance(market_features_series, pd.DataFrame):
+                                market_features_series = market_features_series.iloc[0]
+                            market_features = market_features_series.to_dict()
+                            # Sanitize types
+                            market_features = {k: float(v) if isinstance(v, (np.float32, np.float64)) else v for k,v in market_features.items()}
+                        else:
+                            market_features = self._extract_market_state(candle, all_candles[max(0, i-50):i])
+                            
+                        trade_record = {
+                            'timestamp': datetime.fromtimestamp(candle.timestamp / 1000),
+                            'pair': pair,
+                            'symbol': pair,
+                            'timeframe': timeframe_str,
+                            'side': 'LONG' if position.side.value == 'BUY' else 'SHORT',
+                            'entry_price': position.entry_price,
+                            'exit_price': position.exit_price,
+                            'stop_loss': position.stop_loss,
+                            'take_profit': position.take_profit,
+                            'result': 'WIN' if position.pnl > 0 else 'LOSS',
+                            'profit_loss': position.pnl,
+                            'profit_loss_pct': (position.pnl / (position.entry_price * position.quantity) * 100) if position.entry_price > 0 else 0,
+                            'risk_reward': float(config['take_profit_multiplier']),
+                            'market_state': market_features,
+                            'strategy_version': config.get('strategy_version', 'MSC_v1_Worker' if use_msc else 'TJR_ML_v3_Worker'),
+                            'backtest_run_id': backtest_run_id,
+                            'worker_id': self.worker_id,
+                            # Layer 1 Metrics (Task 8.5)
+                            'agent_name': position.metadata.get('agent', 'Legacy') if hasattr(position, 'metadata') and position.metadata else 'Legacy',
+                            'market_regime': position.metadata.get('regime', 'Unknown') if hasattr(position, 'metadata') and position.metadata else 'Unknown'
+                        }
+                        pending_trades.append(trade_record)
+                    
+                    trades_saved = new_closed_count
+                
+                # Flush batch every 50 trades or if many pending
+                if len(pending_trades) >= 50:
+                    self._flush_trades(pending_trades)
+                    pending_trades = []
+                
             # Update progress every 1000 candles
             if i % 1000 == 0:
                 self.update_progress(
@@ -286,11 +341,12 @@ class OptimizerWorker(BaseAgent):
                     f"Processed {i}/{total_candles}. Saved: {trades_saved}. ML Blocked: {filtered_trades}"
                 )
         
-        # Final Flush
+        # Final Flush (blocks outside loop)
         if pending_trades:
             self._flush_trades(pending_trades)
         
         # Final stats
+        closed_positions = broker.get_closed_positions()
         final_balance = broker.get_balance()
         total_trades = len(closed_positions)
         winning_trades = sum(1 for p in closed_positions if p.pnl > 0)
@@ -301,7 +357,7 @@ class OptimizerWorker(BaseAgent):
         total_loss = abs(sum(p.pnl for p in closed_positions if p.pnl < 0))
         profit_factor = (total_profit / total_loss) if total_loss > 0 else 0
         
-        # Max Drawdown (Task 8.6)
+        # Max Drawdown
         equity_curve = broker.equity_curve
         max_drawdown = 0.0
         if equity_curve:
@@ -312,7 +368,7 @@ class OptimizerWorker(BaseAgent):
                 drawdown = (peak - val) / peak
                 if drawdown > max_drawdown:
                     max_drawdown = float(drawdown)
-        
+
         result = {
             'pair': pair,
             'timeframe': timeframe_str,
@@ -341,9 +397,15 @@ class OptimizerWorker(BaseAgent):
     def _flush_trades(self, trades: List[Dict]):
         """Persist a batch of trades to DB"""
         if not trades: return
+        if self.db_failures > 3: return  # Skip if DB is down
+        
         try:
             with get_db_session() as db:
                 for t in trades:
                     TradeRepository.create(db, t)
         except Exception as e:
-            self.log('ERROR', f"Failed to flush trades batch: {str(e)}")
+            self.db_failures += 1
+            if self.db_failures <= 3:
+                self.log('ERROR', f"Failed to flush trades batch: {str(e)}")
+            elif self.db_failures == 4:
+                self.log('WARNING', "DB seems down. Disabling trade persistence for this worker.")

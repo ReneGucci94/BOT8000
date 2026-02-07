@@ -185,3 +185,11 @@ def calculate_ema(series: MarketSeries, period: int) -> float:
     return float(result) if not pd.isna(result) else float(closes.iloc[-1])
 
 
+def load_candles_from_csv(filepath: str) -> List[Candle]:
+    """Helper to load candles using standard utils."""
+    from src.utils.data_loader import load_binance_csv
+    from .timeframe import Timeframe
+    # Default to H4 for WFO as per request/files
+    return load_binance_csv(filepath, Timeframe.H4)
+
+
