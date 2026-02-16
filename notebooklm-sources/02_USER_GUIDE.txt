@@ -1,0 +1,171 @@
+# BOT8000 - Guía de Uso y Comandos
+
+## Inicio Rápido
+
+### Ver Estado del Sistema
+```bash
+python3 ~/.openclaw/skills/bot8000-trading/scripts/bot8000_status.py
+```
+
+Muestra:
+- Estado de contenedores Docker
+- Conexión a PostgreSQL
+- Uso de recursos (CPU, RAM)
+- Últimos logs
+
+### Ejecutar Backtest
+```bash
+python3 ~/.openclaw/skills/bot8000-trading/scripts/bot8000_backtest.py --days 30 --symbol BTCUSDT
+```
+
+Parámetros:
+- `--days`: Días de datos históricos (default: 30)
+- `--symbol`: Par de trading (default: BTCUSDT)
+- `--timeframe`: Timeframe (1m, 5m, 15m, 1h, 4h, 1d)
+
+### Ver Métricas
+```bash
+python3 ~/.openclaw/skills/bot8000-trading/scripts/bot8000_metrics.py --period 7d
+```
+
+Períodos disponibles: `1d`, `7d`, `30d`, `90d`, `all`
+
+### Deploy a GCP
+```bash
+~/.openclaw/skills/bot8000-trading/scripts/bot8000_deploy.sh --env production
+```
+
+## API Endpoints
+
+Base URL: `http://34.55.73.193:8000`
+
+### Health Check
+```bash
+curl http://34.55.73.193:8000/health
+```
+
+### Ejecutar Pipeline de Trading
+```bash
+curl -X POST http://34.55.73.193:8000/api/run-pipeline \
+  -H "Content-Type: application/json" \
+  -d '{"symbol": "BTCUSDT", "timeframe": "4h"}'
+```
+
+### Ver Estadísticas
+```bash
+curl http://34.55.73.193:8000/api/stats/trades
+```
+
+### Ver Estrategias Aprobadas
+```bash
+curl http://34.55.73.193:8000/api/strategies/approved
+```
+
+### Ver Patrones ML
+```bash
+curl http://34.55.73.193:8000/api/ml/patterns
+```
+
+## Configuración
+
+### Variables de Entorno
+
+Archivo: `.env` o `docker-compose.yml`
+
+```bash
+# Base de datos
+DATABASE_URL=postgresql://postgres:password@host:5432/trading_bot_ml
+
+# Modo de operación
+TRADING_MODE=simulation  # simulation | paper | live
+
+# API Keys (usar Secret Manager en producción)
+API_KEY=tu_api_key
+SECRET_KEY=tu_secret_key
+
+# Configuración de logging
+LOG_LEVEL=INFO
+```
+
+### Archivos de Configuración
+
+**`optimizer_config.yaml`** - Configuración de optimización:
+```yaml
+timeframes: ["15m", "1h", "4h"]
+pairs: ["BTCUSDT", "ETHUSDT"]
+stop_losses: [0, 500, 1000]  # 0 = Structural
+risk_per_trade: 0.01  # 1%
+```
+
+**`dry_run_config.yaml`** - Simulación:
+```yaml
+initial_balance: 10000
+fee_rate: 0.001
+parallel: true
+```
+
+## Estructura de Directorios
+
+```
+BOT8000/
+├── src/
+│   ├── agents/          # 6 agentes de trading
+│   ├── alphas/          # Generadores de señales
+│   ├── api/             # FastAPI REST API
+│   ├── core/            # Orquestador y lógica central
+│   ├── database/        # Modelos y conexión
+│   ├── execution/       # Gestión de órdenes y riesgo
+│   ├── ml/              # Machine Learning
+│   ├── optimization/    # Genetic Algorithm y WFO
+│   ├── portfolio/       # Gestión de cartera
+│   ├── simulation/      # Backtesting
+│   ├── strategy/        # Estrategias de trading
+│   └── utils/           # Utilidades
+├── scripts/             # Scripts de utilidad
+├── tests/               # Tests unitarios
+├── docs/                # Documentación
+├── data/                # Datos históricos
+├── results/             # Resultados de backtests
+└── gcp-bot8000/         # Configuración GCP
+```
+
+## Comandos Docker
+
+### Ver logs en tiempo real
+```bash
+docker logs -f bot8000
+```
+
+### Reiniciar bot
+```bash
+docker-compose restart bot8000
+```
+
+### Acceder a base de datos
+```bash
+docker exec -it trading_bot_postgres psql -U postgres -d trading_bot_ml
+```
+
+## Troubleshooting
+
+### Error de conexión a base de datos
+1. Verificar que PostgreSQL está corriendo: `docker ps`
+2. Revisar DATABASE_URL en configuración
+3. Probar conexión manual desde contenedor
+
+### Bot no genera señales
+1. Verificar que hay datos históricos en `data/`
+2. Revisar logs: `docker logs bot8000 | grep -i error`
+3. Confirmar que agentes están activos: `/api/agents/status`
+
+### Drawdown alto
+1. Revisar configuración de riesgo en `risk.py`
+2. Verificar circuit breakers están activos
+3. Considerar pausar bot: `docker-compose stop bot8000`
+
+## Recursos
+
+- **Documentación API:** http://34.55.73.193:8000/docs
+- **Repositorio:** https://github.com/ReneGucci94/BOT8000
+- **Reporte Ejecutivo:** `docs/BOT8000-Executive-Report.pdf`
+- **Skill de OpenClaw:** `~/.openclaw/skills/bot8000-trading/`

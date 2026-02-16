@@ -11,13 +11,37 @@ class TJRStrategy:
     Orchestrator for TJR Price Action Strategy.
     Scans for Setups (OBs formed by Sweep+BOS) and triggers on Retest.
     """
-    def __init__(self, fixed_stop_loss: Optional[Decimal] = None, take_profit_multiplier: Decimal = Decimal("2.0")):
+    def __init__(
+        self, 
+        fixed_stop_loss: Optional[Decimal] = None, 
+        take_profit_multiplier: Decimal = Decimal("2.0"),
+        stop_loss_atr_multiplier: Optional[Decimal] = None
+    ):
         """
         :param fixed_stop_loss: If provided, uses this fixed USD distance for SL instead of structural low.
         :param take_profit_multiplier: R-Multiple for TP (default 2.0).
+        :param stop_loss_atr_multiplier: If provided, uses ATR * this multiplier for SL distance.
         """
         self.fixed_stop_loss = fixed_stop_loss
         self.take_profit_multiplier = take_profit_multiplier
+        self.stop_loss_atr_multiplier = stop_loss_atr_multiplier
+
+    def _calculate_atr(self, series, period: int = 14) -> Optional[Decimal]:
+        """Calculate Average True Range for SL sizing."""
+        if len(series) < period + 1:
+            return None
+        
+        tr_values = []
+        for i in range(-period, 0):
+            candle = series[i]
+            prev_candle = series[i - 1]
+            high_low = candle.high - candle.low
+            high_prev_close = abs(candle.high - prev_candle.close)
+            low_prev_close = abs(candle.low - prev_candle.close)
+            tr = max(high_low, high_prev_close, low_prev_close)
+            tr_values.append(tr)
+        
+        return sum(tr_values) / len(tr_values)
 
     def analyze(self, market: MarketState, timeframe: Timeframe = Timeframe.M5) -> Optional[TradeSignal]:
         series = market.get_series(timeframe)
@@ -50,11 +74,18 @@ class TJRStrategy:
             return None
             
         # 3. Generate Signal
+        # Calculate ATR if needed for ATR-based SL
+        atr = None
+        if self.stop_loss_atr_multiplier:
+            atr = self._calculate_atr(series)
+        
         if valid_setup.type == OBType.BULLISH:
             entry = current_candle.close
             
-            # SL Logic
-            if self.fixed_stop_loss and self.fixed_stop_loss > 0:
+            # SL Logic: ATR > Fixed > Structural
+            if self.stop_loss_atr_multiplier and atr:
+                sl = entry - (atr * self.stop_loss_atr_multiplier)
+            elif self.fixed_stop_loss and self.fixed_stop_loss > 0:
                 sl = entry - self.fixed_stop_loss
             else:
                 sl = valid_setup.bottom
@@ -75,8 +106,10 @@ class TJRStrategy:
         elif valid_setup.type == OBType.BEARISH:
             entry = current_candle.close
             
-            # SL Logic
-            if self.fixed_stop_loss and self.fixed_stop_loss > 0:
+            # SL Logic: ATR > Fixed > Structural
+            if self.stop_loss_atr_multiplier and atr:
+                sl = entry + (atr * self.stop_loss_atr_multiplier)
+            elif self.fixed_stop_loss and self.fixed_stop_loss > 0:
                 sl = entry + self.fixed_stop_loss
             else:
                 sl = valid_setup.top

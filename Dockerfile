@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     gcc \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file into the container at /app
@@ -21,9 +22,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the current directory contents into the container at /app
 COPY . /app
 
+# Make startup script executable
+RUN chmod +x run_system.sh
+
 # Define environment variable
 ENV NAME Bot8000
 ENV PYTHONPATH /app
+ENV TRADING_MODE simulation
+ENV API_KEY ""
+ENV SECRET_KEY ""
 
-# Run app.py when the container launches
-CMD ["python", "src/agents/orchestrator.py"]
+# Run run_system.sh when the container launches
+CMD ["./run_system.sh"]

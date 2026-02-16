@@ -183,8 +183,8 @@ def calculate_fitness(
         Fitness (a maximizar). -inf si falla hard checks.
     """
     # 1. Hard checks (Codex PARTE 1.3):
-    if metrics_val.trades < 10:
-        return float('-inf')
+    # Note: trades == 0 is handled by the gradual penalty below (factor = 0/10 = 0)
+    # This avoids all-`-inf` populations that break GA optimization.
     if metrics_val.maxdd > 0.25:
         return float('-inf')
     if metrics_val.return_pct < -0.05:
@@ -204,5 +204,11 @@ def calculate_fitness(
     
     # 6. Fitness = 0.25*ScoreSub + 0.75*ScoreVal - OverfitPenalty - RegPenalty
     fitness = (0.25 * score_sub) + (0.75 * score_val) - overfit_penalty - reg_penalty
-    
+
+    # New Gradual Penalty for Low Trades (Task 5)
+    # Replaces previous hard check for trades < 10
+    if metrics_val.trades < 10:
+        trade_penalty_factor = metrics_val.trades / 10.0
+        fitness *= trade_penalty_factor
+
     return fitness

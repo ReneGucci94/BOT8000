@@ -11,6 +11,8 @@ import time
 from datetime import datetime
 from typing import Dict, Any, List, Tuple
 from pathlib import Path
+import argparse
+import math
 
 from src.core.market import load_candles_from_csv
 from src.agents.worker import OptimizerWorker
@@ -24,7 +26,8 @@ def create_fitness_function(
     worker: OptimizerWorker,
     subtrain_data,
     valtrain_data,
-    param_space
+    param_space,
+    window_warmup_data
 ):
     """
     Crea función de fitness que usa Worker REAL.
@@ -45,17 +48,22 @@ def create_fitness_function(
                 "months": subtrain_months,
                 "backtest_run_id": "wfo_subtrain",
                 "initial_balance": 10000.0,
-                "stop_loss": 200,
-                "take_profit_multiplier": 2.0,
+                "stop_loss": 100,  # Fallback only; GA's stop_loss_atr_mult takes priority
+                "take_profit_multiplier": 2.0,  # Fallback only; GA's take_profit_r_mult takes priority
                 "fee_rate": 0.001,
-                "risk_per_trade_pct": 2.0,
-                "use_msc": True
+                "risk_per_trade_pct": 1.0,  # Fallback only; GA's risk_per_trade_pct takes priority
+                "use_msc": True,
+                "max_portfolio_risk": 0.10,
+                "use_dd_scaling": True
             }
             
+            # Backtest en SubTrain
+            # Use window_warmup_data for SubTrain (as it is the start of Train)
             result_sub = worker.run(
                 config=config_sub,
                 params=params,
-                warmup_data=None,
+                candles=subtrain_data,
+                warmup_candles=window_warmup_data,
                 initial_balance=10000.0
             )
             
@@ -86,17 +94,24 @@ def create_fitness_function(
                 "months": valtrain_months,
                 "backtest_run_id": "wfo_valtrain",
                 "initial_balance": 10000.0,
-                "stop_loss": 200,
-                "take_profit_multiplier": 2.0,
+                "stop_loss": 100,  # Fallback only; GA's stop_loss_atr_mult takes priority
+                "take_profit_multiplier": 2.0,  # Fallback only; GA's take_profit_r_mult takes priority
                 "fee_rate": 0.001,
-                "risk_per_trade_pct": 2.0,
-                "use_msc": True
+                "risk_per_trade_pct": 1.0,  # Fallback only; GA's risk_per_trade_pct takes priority
+                "use_msc": True,
+                "max_portfolio_risk": 0.10,
+                "use_dd_scaling": True
             }
+            
+            # Backtest en ValTrain
+            # Warmup for ValTrain is the end of SubTrain
+            val_warmup = subtrain_data[-240:] if len(subtrain_data) >= 240 else subtrain_data
             
             result_val = worker.run(
                 config=config_val,
                 params=params,
-                warmup_data=None,
+                candles=valtrain_data,
+                warmup_candles=val_warmup,
                 initial_balance=10000.0
             )
             
@@ -156,7 +171,7 @@ def split_train_data(train_data, n_months_train: int):
     return subtrain_data, valtrain_data
 
 
-def run_wfo():
+def run_wfo(population_size: int = 50, num_generations: int = 10, window_limit: int = None):
     """
     Ejecuta Walk-Forward Optimization completo.
     """
@@ -177,8 +192,8 @@ def run_wfo():
     )
     
     config_ga = GAConfig(
-        population_size=32,
-        num_generations=8,
+        population_size=population_size,
+        num_generations=num_generations,
         tournament_size=3,
         crossover_rate=0.8,
         mutation_rate=0.15,
@@ -217,6 +232,10 @@ def run_wfo():
     print("Generating windows...")
     windows = generate_windows(full_data, config_windows)
     print(f"Generated {len(windows)} windows")
+    
+    if window_limit:
+        windows = windows[:window_limit]
+        print(f"Limiting to {window_limit} windows for testing.")
     print()
     
     # Resultados
@@ -251,7 +270,8 @@ def run_wfo():
             worker=worker,
             subtrain_data=subtrain_data,
             valtrain_data=valtrain_data,
-            param_space=param_space
+            param_space=param_space,
+            window_warmup_data=window.warmup_data
         )
         
         # Ejecutar GA
@@ -267,10 +287,16 @@ def run_wfo():
         
         best_individual, history = ga.optimize()
         
+        # Phase 4: Guard against all-`-inf` GA result
+        if not math.isfinite(best_individual.fitness):
+            print(f"  ⚠️ WARNING: No valid solution found (fitness=-inf). Using default params.")
+            best_individual.params = param_space.get_defaults()
+        
         elapsed = time.time() - start_time
         print()
         print(f"  GA completed in {elapsed/3600:.1f} hours")
-        print(f"  Best fitness (train): {best_individual.fitness:.4f}")
+        best_fit_str = f"{best_individual.fitness:.4f}" if math.isfinite(best_individual.fitness) else "-inf"
+        print(f"  Best fitness (train): {best_fit_str}")
         print(f"  Generations run: {len(history)}")
         print()
         
@@ -284,17 +310,23 @@ def run_wfo():
             "months": test_months,
             "backtest_run_id": f"wfo_test_w{i+1}",
             "initial_balance": cumulative_balance,
-            "stop_loss": 200,
-            "take_profit_multiplier": 2.0,
+            "stop_loss": 100,  # Fallback only; GA's stop_loss_atr_mult takes priority
+            "take_profit_multiplier": 2.0,  # Fallback only; GA's take_profit_r_mult takes priority
             "fee_rate": 0.001,
-            "risk_per_trade_pct": 2.0,
-            "use_msc": True
+            "risk_per_trade_pct": 1.0,  # Fallback only; GA's risk_per_trade_pct takes priority
+            "use_msc": True,
+            "max_portfolio_risk": 0.10,
+            "use_dd_scaling": True,
         }
+        
+        # Warmup for Test is the end of Train
+        test_warmup = window.train_data[-240:] if len(window.train_data) >= 240 else window.train_data
         
         result_test = worker.run(
             config=config_test,
             params=best_individual.params,
-            warmup_data=window.warmup_data,
+            candles=window.test_data,
+            warmup_candles=test_warmup,
             initial_balance=cumulative_balance
         )
         
@@ -330,6 +362,21 @@ def run_wfo():
         
         results.append(window_result)
         cumulative_balance = new_balance
+
+        # Partial Save (Auto-save after each window)
+        try:
+            partial_file = Path("results/wfo/partial_results.json")
+            partial_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(partial_file, 'w') as pf:
+                json.dump({
+                    "timestamp": datetime.now().isoformat(),
+                    "windows_completed": len(results),
+                    "current_balance": cumulative_balance,
+                    "results": results
+                }, pf, indent=2)
+            print(f"  [AUTO-SAVE] Window {i+1} saved to {partial_file}")
+        except Exception as e:
+            print(f"  [WARN] Failed to save partial results: {e}")
     
     # Análisis agregado
     print()
@@ -359,7 +406,6 @@ def run_wfo():
     
     # Overfitting detection
     pf_values = [r["test_pf"] for r in results]
-    import math
     log_pf_values = [math.log(max(pf, 0.01)) for pf in pf_values]
     std_log_pf = (sum((x - sum(log_pf_values)/len(log_pf_values))**2 for x in log_pf_values) / len(log_pf_values)) ** 0.5
     
@@ -434,4 +480,11 @@ def run_wfo():
 
 
 if __name__ == "__main__":
-    run_wfo()
+    parser = argparse.ArgumentParser(description='Run Walk-Forward Optimization')
+    parser.add_argument('--population', type=int, default=50, help='GA Population size')
+    parser.add_argument('--generations', type=int, default=10, help='GA Generations')
+    parser.add_argument('--limit', type=int, default=None, help='Limit number of windows (for testing)')
+    
+    args = parser.parse_args()
+    
+    run_wfo(population_size=args.population, num_generations=args.generations, window_limit=args.limit)

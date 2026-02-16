@@ -121,3 +121,31 @@ class InMemoryBroker(Broker):
             else:
                 remaining.append(pos)
         self.positions = remaining
+
+    def get_current_drawdown_pct(self) -> Decimal:
+        """Calculate current drawdown from equity peak."""
+        if not self.equity_curve:
+            return Decimal("0.0")
+        
+        # Determine peak equity so far
+        # Note: self.equity_curve can grow large, optimization: track peak in _balance update
+        # For now, max() is O(N) but safe.
+        peak = max(self.equity_curve)
+        current = self._balance
+        
+        if peak <= 0:
+            return Decimal("0.0")
+            
+        return (peak - current) / peak
+
+    def get_open_risk(self) -> Decimal:
+        """Calculate total risk of all open positions."""
+        total_risk = Decimal("0")
+        for pos in self.positions:
+            if pos.stop_loss and pos.entry_price:
+                risk_per_share = abs(pos.entry_price - pos.stop_loss)
+                total_risk += risk_per_share * pos.quantity
+            else:
+                # Fallback: Full value at risk if no SL
+                total_risk += pos.entry_price * pos.quantity
+        return total_risk

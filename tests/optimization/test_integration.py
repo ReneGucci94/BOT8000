@@ -336,8 +336,10 @@ def test_integration_fitness_rejects_bad_candidates():
     
     fitness = calculate_fitness(params_bad, metrics_sub, metrics_val, space)
     
-    # Debe retornar -inf (hard fail)
-    assert fitness == float('-inf')
+    # With only 5 val trades, fitness is heavily penalized but finite
+    # (hard -inf check was removed in Sprint 1 to prevent all-inf populations)
+    assert fitness != float('-inf'), "Fitness should be finite, not -inf"
+    assert fitness < 0.3, f"Fitness should be heavily penalized, got {fitness}"
 
 
 def test_integration_ga_converges_to_better_params():

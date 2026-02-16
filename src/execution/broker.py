@@ -63,3 +63,13 @@ class Broker(ABC):
     def cancel_order(self, order_id: str) -> bool:
         """Cancels an existing order."""
         pass
+
+    @abstractmethod
+    def get_current_drawdown_pct(self) -> Decimal:
+        """Returns current drawdown percentage (0.0 to 1.0)."""
+        pass
+
+    @abstractmethod
+    def get_open_risk(self) -> Decimal:
+        """Returns total open risk amount (Sum of |Entry-SL|*Qty)."""
+        pass

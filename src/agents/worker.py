@@ -7,6 +7,7 @@ from datetime import datetime
 import statistics
 import pandas as pd
 import numpy as np
+import math
 
 from src.agents.base import BaseAgent
 from src.database import get_db_session
@@ -43,6 +44,9 @@ class OptimizerWorker(BaseAgent):
         self.feature_extractor = FeatureExtractor()
         self._combiner: Optional[AlphaCombiner] = None
         self.db_failures = 0
+        self._cached_features_map: Optional[pd.DataFrame] = None
+        self._cached_candles_id: Optional[int] = None
+
     
     def run(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """
@@ -77,17 +81,34 @@ class OptimizerWorker(BaseAgent):
             else:
                 self.log('INFO', f"Running with ML Filter (Threshold: {ml_threshold})")
         
+        
+        # Extract WFO Params (Optimization)
+        # Using config.get('params') which comes from GA
+        wfo_params = config.get('params')
+        if wfo_params is None:
+            wfo_params = {}
+            # self.log('DEBUG', "No WFO params provided, using defaults")
+        
         # Alpha Engine Setup (Task 6.9)
         use_alpha_engine = config.get('use_alpha_engine', False)
         if use_alpha_engine:
             self.log('INFO', "Alpha Engine active for signal generation")
-            # Iniciar alphas con los pesos definidos por el usuario
+            
+            # Map WFO params to Alpha Weights
+            # Defaults match the original hardcoded values if not optimizing
+            w_ob = wfo_params.get('g_ob_quality', 1.5)
+            w_mom = wfo_params.get('g_momentum', 2.0)
+            w_vol = wfo_params.get('g_volatility', 0.5)
+            w_ml = wfo_params.get('g_ml_confidence', 1.0)
+            w_liq = wfo_params.get('g_liquidity', 0.8)
+            
+            # Iniciar alphas con los pesos definidos por el usuario / GA
             self._combiner = AlphaCombiner([
-                (Alpha_OB_Quality(), 1.5),
-                (Alpha_Momentum(), 2.0),
-                (Alpha_Volatility(), 0.5),
-                (Alpha_ML_Confidence(analyzer=analyzer), 1.0),
-                (Alpha_Liquidity(), 0.8)
+                (Alpha_OB_Quality(), w_ob),
+                (Alpha_Momentum(), w_mom),
+                (Alpha_Volatility(), w_vol),
+                (Alpha_ML_Confidence(analyzer=analyzer), w_ml),
+                (Alpha_Liquidity(), w_liq)
             ])
         
         # MSC Orchestrator Setup (Task 8.5)
@@ -95,33 +116,56 @@ class OptimizerWorker(BaseAgent):
         orchestrator = None
         if use_msc:
             self.log('INFO', "MSC Orchestrator active (Layer 1 Brain)")
+            # Pass optimized thresholds if available
+            # Note: MSCOrchestrator might need to be updated to accept these, 
+            # or we set them after init. For now, we just init it.
             orchestrator = MSCOrchestrator()
         
         self.log('INFO', f"Starting backtest for {pair} {timeframe_str} {year}")
         
-        # Load all candles for the year
-        all_candles = []
-        data_dir = Path("data/raw")
+        # Load data (Memory vs Disk)
+        candles_arg = config.get('candles')
+        warmup_candles_arg = config.get('warmup_candles', [])
         
-        for month in months:
-            filename = f"{pair}-{timeframe_str}-{year}-{month:02d}.csv"
-            filepath = data_dir / filename
+        if candles_arg:
+            # In-memory execution (WFO/Optimization)
+            # Combine warmup + main data for feature calculation
+            all_candles = warmup_candles_arg + candles_arg
+            # Trading starts after warmup
+            start_index = len(warmup_candles_arg)
+            self.log('INFO', f"Using in-memory data: {len(candles_arg)} main + {len(warmup_candles_arg)} warmup candles")
+        else:
+            # Disk loading (Legacy/Manual run)
+            all_candles = []
+            data_dir = Path("data/raw")
             
-            if not filepath.exists():
-                self.log('WARNING', f"File not found: {filename}")
-                continue
+            for month in months:
+                filename = f"{pair}-{timeframe_str}-{year}-{month:02d}.csv"
+                filepath = data_dir / filename
+                
+                if not filepath.exists():
+                    self.log('WARNING', f"File not found: {filename}")
+                    continue
+                
+                try:
+                    candles = load_binance_csv(str(filepath), timeframe)
+                    all_candles.extend(candles)
+                except Exception as e:
+                    self.log('ERROR', f"Failed to load {filename}: {str(e)}")
             
-            try:
-                candles = load_binance_csv(str(filepath), timeframe)
-                all_candles.extend(candles)
-            except Exception as e:
-                self.log('ERROR', f"Failed to load {filename}: {str(e)}")
-        
-        if not all_candles:
-            raise ValueError(f"No data found for {pair} {timeframe_str} {year}")
+            if not all_candles:
+                raise ValueError(f"No data found for {pair} {timeframe_str} {year}")
+                
+            # Legacy: warmup_data might be passed but not prepended to file data
+            # Use strict approach: if loaded from disk, start_index=0 (unless warmup logic added later)
+            start_index = 0
+            
+            # Legacy warmup handling (kept for compatibility if needed, but discouraged)
+            # If warmup_data passed in kwargs but loading from disk, we prepend it?
+            # For now, keep simple: disk loading = 0 offset.
         
         total_candles = len(all_candles)
-        self.log('INFO', f"Total candles to process: {total_candles}")
+        self.log('INFO', f"Total candles to process: {total_candles} (Start trading at index {start_index})")
         
         # Pre-compute features for performance if ML is needed or for reporting
         # Convert candles to DataFrame for feature extraction
@@ -137,19 +181,39 @@ class OptimizerWorker(BaseAgent):
         # Check timestamps
         df_candles['timestamp'] = pd.to_datetime(df_candles['timestamp'], unit='ms')
         
-        # Calculate features
-        self.log('INFO', "Calculating features...")
-        df_features = self.feature_extractor.add_all_features(df_candles)
-        
-        # Re-align features with candles list (dropna might have removed some initial rows)
-        # We need to map candle index to feature row
-        # Simple map by timestamp
-        features_map = df_features.set_index('timestamp')
+        # Optimization for Mac M1: Cache features if candles haven't changed (Task 8.9)
+        current_candles_id = id(all_candles)
+        if self._cached_candles_id == current_candles_id and self._cached_features_map is not None:
+            features_map = self._cached_features_map
+        else:
+            # Calculate features (Expensive operation)
+            self.log('INFO', f"Calculating features for {len(all_candles)} candles...")
+            df_features = self.feature_extractor.add_all_features(df_candles)
+            features_map = df_features.set_index('timestamp')
+            # Store in cache
+            self._cached_features_map = features_map
+            self._cached_candles_id = current_candles_id
         
         # Initialize trading components
+        # Strategy Params
+        # Allow WFO params to override config defaults
+        stop_loss_param = config.get('stop_loss', 100)
+        # If optimization param 'stop_loss_atr_mult' exists, we might pass it.
+        # TJRStrategy currently takes fixed SL. We need to update TJRStrategy 
+        # to support ATR multiplier if we want to optimize it.
+        # For now, we create it assuming TJRStrategy will support it or we pass it via **kwargs if flexible?
+        # Let's assume we update TJRStrategy signature.
+        
+        str_stop_loss = wfo_params.get('fixed_stop_loss', config.get('stop_loss')) # Only if optimizing fixed
+        # But param_space uses 'stop_loss_atr_mult'. 
+        atr_mult_sl = wfo_params.get('stop_loss_atr_mult', None)
+        
+        take_profit_mult = wfo_params.get('take_profit_r_mult', config.get('take_profit_multiplier', 2.0))
+        
         strategy = TJRStrategy(
-            fixed_stop_loss=Decimal(str(config['stop_loss'])),
-            take_profit_multiplier=Decimal(str(config['take_profit_multiplier']))
+            fixed_stop_loss=Decimal(str(str_stop_loss)) if str_stop_loss else None,
+            take_profit_multiplier=Decimal(str(take_profit_mult)),
+            stop_loss_atr_multiplier=Decimal(str(atr_mult_sl)) if atr_mult_sl else None
         )
         
         broker = InMemoryBroker(
@@ -158,8 +222,20 @@ class OptimizerWorker(BaseAgent):
         )
         
         from src.execution.risk import RiskConfig # Import needed inside or at top
+        
+        # Risk Params
+        risk_pct = wfo_params.get('risk_per_trade_pct', config.get('risk_per_trade_pct', 1.0))
+        max_portfolio_risk = config.get('max_portfolio_risk', None)
+        use_dd_scaling = config.get('use_dd_scaling', False)
+        
+        from src.execution.risk import RiskConfig  # Ensure import is available
+
         risk_manager = RiskManager(
-            config=RiskConfig(risk_percentage=Decimal(str(config['risk_per_trade_pct'])) / 100)
+            config=RiskConfig(
+                risk_percentage=Decimal(str(risk_pct)) / 100,
+                max_portfolio_risk=Decimal(str(max_portfolio_risk)) if max_portfolio_risk else None,
+                use_dd_scaling=use_dd_scaling
+            )
         )
         
         executor = TradeExecutor(
@@ -170,23 +246,18 @@ class OptimizerWorker(BaseAgent):
         
         market = MarketState.empty(pair)
         
-        # --- Warmup Phase (Task 6.9/WFO) ---
-        warmup_data = config.get('warmup_data', [])
-        if warmup_data:
-            self.log('INFO', f"Warming up with {len(warmup_data)} candles...")
-            for w_candle in warmup_data:
-                market = market.update(w_candle)
-                
-                # Update Broker positions during warmup if needed (usually just price update)
-                if hasattr(broker, 'update_positions'):
-                    broker.update_positions(w_candle.close)
+        # --- Warmup Phase (Integrated) ---
+        # No explicit separate loop needed as features are calc on all_candles
+        # Just ensure market state is updated for warmup part
+        # Logic below handles it via 'start_index' skipping trade logic
                     
         trades_saved = 0
         filtered_trades = 0
         pending_trades = []
         
-        # Extract WFO params if present
-        wfo_params = config.get('params')
+        
+        # Extract WFO params if present (redundant reassignment but keeping for clarity if used later)
+        # wfo_params extracted at top of run()
         
         for i, candle in enumerate(all_candles):
             # Update market state
@@ -196,6 +267,10 @@ class OptimizerWorker(BaseAgent):
             if hasattr(broker, 'update_positions'):
                 broker.update_positions(candle.close)
             
+            # SKIP TRADING during Warmup
+            if i < start_index:
+                continue
+
             if not broker.get_positions():
                 # Bifurcation (Task 8.5)
                 signal = None
@@ -349,27 +424,109 @@ class OptimizerWorker(BaseAgent):
         closed_positions = broker.get_closed_positions()
         final_balance = broker.get_balance()
         total_trades = len(closed_positions)
+        result = self._calculate_metrics(
+            final_balance=final_balance,
+            initial_balance=Decimal(str(config.get("initial_balance", 10000))),
+            pair=pair,
+            timeframe_str=timeframe_str,
+            year=year,
+            trades_saved=trades_saved,
+            filtered_trades=filtered_trades,
+            closed_positions=closed_positions,
+            equity_curve=broker.equity_curve
+        )
+        
+        # Extract win_rate from result for logging
+        win_rate = result.get('win_rate', 0.0)
+        self.log('INFO', f"Backtest finished. WinRate: {win_rate:.2f}%. ML Filtered: {filtered_trades} trades.")
+        
+        return result
+    
+    def _calculate_metrics(
+        self, 
+        final_balance, 
+        initial_balance, 
+        pair, 
+        timeframe_str, 
+        year, 
+        trades_saved, 
+        filtered_trades, 
+        closed_positions, 
+        equity_curve
+    ) -> Dict[str, Any]:
+        """Calculate comprehensive backtest metrics for WFO fitness function"""
+        total_trades = len(closed_positions)
+        
+        # Guard against zero trades to avoid -inf/NaN in fitness
+        if total_trades == 0:
+            return {
+                'pair': pair,
+                'timeframe': timeframe_str,
+                'year': year,
+                'total_trades': 0,
+                'winning_trades': 0,
+                'losing_trades': 0,
+                'final_balance': float(final_balance),
+                'net_profit': 0.0,
+                'return': 0.0,
+                'win_rate': 0.0,
+                'gross_profit': 0.0,
+                'gross_loss': 0.0,
+                'profit_factor': 1.0,
+                'max_drawdown': 0.0,
+                'max_drawdown_pct': 0.0,
+                'sharpe': 0.0,
+                'trades_saved_to_db': trades_saved,
+                'ml_filtered_trades': filtered_trades
+            }
+
         winning_trades = sum(1 for p in closed_positions if p.pnl > 0)
         losing_trades = total_trades - winning_trades
-        win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+        win_rate = (winning_trades / total_trades * 100)
         
-        total_profit = sum(p.pnl for p in closed_positions if p.pnl > 0)
-        total_loss = abs(sum(p.pnl for p in closed_positions if p.pnl < 0))
-        profit_factor = (total_profit / total_loss) if total_loss > 0 else 0
+        gross_profit = float(sum(p.pnl for p in closed_positions if p.pnl > 0))
+        gross_loss = float(abs(sum(p.pnl for p in closed_positions if p.pnl < 0)))
         
-        # Max Drawdown
-        equity_curve = broker.equity_curve
+        # PF Logic: Cap at 10.0 if no loss, avoid 0.0 for winners
+        if gross_loss == 0:
+            profit_factor = 10.0 if gross_profit > 0 else 1.0
+        else:
+            profit_factor = gross_profit / gross_loss
+            
+        net_profit = float(final_balance - initial_balance)
+        return_pct = (net_profit / float(initial_balance) * 100) if initial_balance > 0 else 0.0
+        
+        # Max Drawdown Calculation
         max_drawdown = 0.0
         if equity_curve:
-            peak = equity_curve[0]
+            peak = float(equity_curve[0])
             for val in equity_curve:
-                if val > peak:
-                    peak = val
-                drawdown = (peak - val) / peak
-                if drawdown > max_drawdown:
-                    max_drawdown = float(drawdown)
-
-        result = {
+                val_f = float(val)
+                if val_f > peak:
+                    peak = val_f
+                if peak > 0:
+                    dd = (peak - val_f) / peak
+                    if dd > max_drawdown:
+                        max_drawdown = dd
+        
+        max_drawdown_pct = max_drawdown * 100.0
+        
+        # Sharpe Ratio (Simple, non-annualized, good for relative fitness)
+        sharpe = 0.0
+        if equity_curve and len(equity_curve) > 1:
+            eq = [float(x) for x in equity_curve]
+            # Calculate returns series
+            rets = []
+            for i in range(1, len(eq)):
+                if eq[i-1] > 0:
+                    rets.append((eq[i] / eq[i-1]) - 1.0)
+            
+            if len(rets) >= 2:
+                std = statistics.pstdev(rets)
+                if std > 0:
+                    sharpe = (statistics.mean(rets) / std) * math.sqrt(len(rets))
+        
+        return {
             'pair': pair,
             'timeframe': timeframe_str,
             'year': year,
@@ -377,17 +534,19 @@ class OptimizerWorker(BaseAgent):
             'winning_trades': winning_trades,
             'losing_trades': losing_trades,
             'final_balance': float(final_balance),
+            'net_profit': float(net_profit),
+            'return': round(return_pct, 2),              # REQUIRED by run_wfo
             'win_rate': round(win_rate, 2),
-            'profit_factor': round(float(profit_factor), 2),
-            'max_drawdown_pct': round(max_drawdown * 100, 2),
+            'gross_profit': round(gross_profit, 2),       # REQUIRED by fitness
+            'gross_loss': round(gross_loss, 2),            # REQUIRED by fitness
+            'profit_factor': round(float(profit_factor), 4),
+            'max_drawdown': round(max_drawdown_pct, 2),    # REQUIRED by fitness (in %)
+            'max_drawdown_pct': round(max_drawdown_pct, 2),
+            'sharpe': round(float(sharpe), 4),             # REQUIRED by fitness
             'trades_saved_to_db': trades_saved,
             'ml_filtered_trades': filtered_trades
         }
-        
-        self.log('INFO', f"Backtest finished. WinRate: {win_rate:.2f}%. ML Filtered: {filtered_trades} trades.")
-        
-        return result
-    
+
     def _extract_market_state(self, current_candle, historical_candles: List) -> Dict[str, Any]:
         """Legacy manual extraction (fallback)"""
         if not historical_candles: return {}
@@ -397,7 +556,12 @@ class OptimizerWorker(BaseAgent):
     def _flush_trades(self, trades: List[Dict]):
         """Persist a batch of trades to DB"""
         if not trades: return
-        if self.db_failures > 3: return  # Skip if DB is down
+        if self.db_failures > 0: return  # Skip if DB is down
+        
+        # Optimization for Mac M1: Disable DB persistence during WFO optimization (Task 8.9)
+        # We identify optimization runs by their backtest_run_id (wfo_subtrain/wfo_valtrain)
+        if trades[0].get('backtest_run_id') in ['wfo_subtrain', 'wfo_valtrain']:
+            return
         
         try:
             with get_db_session() as db:
@@ -405,7 +569,4 @@ class OptimizerWorker(BaseAgent):
                     TradeRepository.create(db, t)
         except Exception as e:
             self.db_failures += 1
-            if self.db_failures <= 3:
-                self.log('ERROR', f"Failed to flush trades batch: {str(e)}")
-            elif self.db_failures == 4:
-                self.log('WARNING', "DB seems down. Disabling trade persistence for this worker.")
+            self.log('WARNING', f"DB connection failed. Disabling persistence for this worker. Error: {str(e)}")

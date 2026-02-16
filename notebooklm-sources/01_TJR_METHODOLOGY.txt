@@ -1,0 +1,120 @@
+# BOT8000 Trading Bot - Metodología TJR Price Action
+
+## Filosofía de Trading
+
+El BOT8000 implementa la metodología TJR Price Action, enfocada en:
+- Order Blocks (OB) de alta calidad
+- Quiebres de estructura de mercado (BOS)
+- Cambios de carácter (CHoCH)
+- Fair Value Gaps (FVG)
+- Liquidez y manipulación institucional
+
+## Componentes Principales
+
+### 1. Análisis de Régimen de Mercado
+El bot clasifica el mercado en:
+- **TRENDING:** Tendencia clara (ADX > 25)
+- **RANGING:** Rango lateral (ADX entre 20-25)
+- **HIGH_VOLATILITY:** Alta volatilidad (expansión de ATR)
+- **BREAKOUT_PENDING:** Posible ruptura (volatilidad extrema baja)
+
+### 2. Agentes Especializados (MSC Layer 2)
+
+#### TrendHunterAgent
+- **Bias:** Alto momentum y calidad de OB
+- **Regímenes activos:** TRENDING, HIGH_VOLATILITY
+- **Pesos:** momentum=3.0, ob_quality=2.0, volatility=1.0
+
+#### MeanReversionAgent
+- **Bias:** Reversión a la media
+- **Regímenes activos:** RANGING
+- **Estrategia:** Compra en soporte, venta en resistencia
+
+#### BreakoutHunterAgent
+- **Bias:** Captura de rupturas
+- **Regímenes activos:** BREAKOUT_PENDING
+- **Filtros:** Volumen confirmado, estructura válida
+
+#### VolatilityFilterAgent
+- **Bias:** Protección en alta volatilidad
+- **Función:** Reducir exposición cuando ATR se expande
+
+#### SentimentScoutAgent
+- **Bias:** Análisis de sentimiento de mercado
+- **Inputs:** Métricas on-chain, funding rates
+
+### 3. Alphas (Señales)
+
+| Alpha | Descripción | Fórmula Clave |
+|-------|-------------|---------------|
+| Alpha_OB_Quality | Calidad del Order Block | Liquidez + estructura + confirmación |
+| Alpha_Momentum | Fuerza de tendencia | ADX + alineación EMA |
+| Alpha_Volatility | Expansión/contracción | ATR relativo |
+| Alpha_ML_Confidence | Confianza del modelo ML | Random Forest en features técnicos |
+
+### 4. Gestión de Riesgo
+
+#### Kelly Criterion (1/4 Kelly Conservador)
+```
+f* = (p*b - q) / b
+Donde:
+- f* = fracción óptima del capital
+- p = probabilidad de ganar
+- q = probabilidad de perder (1-p)
+- b = ratio ganancia/pérdida
+```
+
+#### Value at Risk (VaR)
+- VaR 95%: Pérdida máxima esperada con 95% confianza
+- VaR 99%: Pérdida máxima esperada con 99% confianza
+- Expected Shortfall (CVaR): Pérdida promedio en peores casos
+
+#### Circuit Breakers
+- **Nivel 1:** Pausa por 1h si drawdown > 5%
+- **Nivel 2:** Pausa por 4h si drawdown > 10%
+- **Nivel 3:** Detener trading por 24h si drawdown > 15%
+
+## Estrategia TJR
+
+### Entrada Larga
+1. Precio en discount (bajo fair value)
+2. Order Block válido (bullish, alta calidad)
+3. Quiebre de estructura bajista (CHoCH)
+4. Stop loss debajo del OB (estructural)
+5. Take profit: 2x el riesgo mínimo
+
+### Entrada Corta
+1. Precio en premium (sobre fair value)
+2. Order Block válido (bearish, alta calidad)
+3. Quiebre de estructura alcista (CHoCH)
+4. Stop loss sobre el OB (estructural)
+5. Take profit: 2x el riesgo mínimo
+
+## Métricas de Éxito
+
+| Métrica | Objetivo | Actual |
+|---------|----------|--------|
+| Win Rate | > 55% | Pendiente |
+| Profit Factor | > 1.2 | Pendiente |
+| Max Drawdown | < 15% | Pendiente |
+| Sharpe Ratio | > 1.0 | Pendiente |
+
+## Walk Forward Optimization (WFO)
+
+El bot usa WFO para validar estrategias:
+1. **In-Sample:** Optimizar parámetros en datos históricos
+2. **Out-of-Sample:** Validar en datos no vistos
+3. **Forward Test:** Paper trading antes de live
+
+Criterios de aprobación:
+- Win Rate > 55% en out-of-sample
+- Profit Factor > 1.2
+- Drawdown < 15%
+- Resultados consistentes en múltiples ventanas
+
+## Notas Importantes
+
+- El bot opera en modo simulador (paper trading) hasta validar métricas
+- No se requiere intervención humana durante operación normal
+- Todos los trades se loggean en PostgreSQL para análisis posterior
+- El orquestador monitorea drawdown y puede pausar automáticamente

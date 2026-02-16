@@ -352,3 +352,31 @@ def test_ga_elitism_preserves_best():
     
     expected_evals = 10 + 8 + 8
     assert evaluation_count == expected_evals
+
+
+def test_ga_handles_all_negative_inf_fitness():
+    """
+    GA should not crash when all individuals have -inf fitness.
+    This was the root cause of the WFO failure.
+    """
+    space = get_default_param_space()
+    config = GAConfig(
+        population_size=8,
+        num_generations=3,
+        seed=42
+    )
+    
+    def always_inf_fitness(params):
+        return float('-inf')
+    
+    ga = GeneticAlgorithm(
+        param_space=space,
+        config=config,
+        fitness_function=always_inf_fitness
+    )
+    
+    best, history = ga.optimize()
+    
+    assert best is not None
+    assert best.fitness == float('-inf')
+    assert len(history) > 0

@@ -228,8 +228,9 @@ def test_calculate_fitness_full_pipeline():
 
 def test_calculate_fitness_hard_fail_low_val_trades():
     """
-    Si ValTrain tiene < 10 trades, fitness = -inf.
-    Spec: Codex PARTE 1.3
+    Si ValTrain tiene < 10 trades, fitness gets a gradual penalty (not -inf).
+    trades=5 → penalty factor = 5/10 = 0.5 → fitness is halved.
+    Spec: Updated behavior (removed hard -inf for trades < 10).
     """
     space = get_default_param_space()
     params = space.get_defaults()
@@ -240,7 +241,7 @@ def test_calculate_fitness_hard_fail_low_val_trades():
     )
     
     metrics_val = SegmentMetrics(
-        trades=5,  # < 10 (HARD FAIL)
+        trades=5,  # < 10 → gradual penalty factor = 0.5
         return_pct=0.10, maxdd=0.05,
         sharpe=1.0, pf=1.5, gross_profit=5000, gross_loss=3333
     )
@@ -252,7 +253,39 @@ def test_calculate_fitness_hard_fail_low_val_trades():
         param_space=space
     )
     
-    assert fitness == float('-inf')
+    # Should be finite (penalized) not -inf
+    assert fitness != float('-inf')
+    assert fitness > 0  # With 5 trades and decent metrics, should be positive
+    
+
+def test_calculate_fitness_zero_val_trades_is_not_negative_inf():
+    """
+    0 val trades should get gradual penalty (fitness=0), not -inf.
+    The gradual penalty factor = 0/10 = 0 → fitness * 0 = 0.
+    """
+    space = get_default_param_space()
+    params = space.get_defaults()
+    
+    metrics_sub = SegmentMetrics(
+        trades=50, return_pct=0.20, maxdd=0.10,
+        sharpe=1.5, pf=2.0, gross_profit=10000, gross_loss=5000
+    )
+    
+    metrics_val = SegmentMetrics(
+        trades=0,  # 0 trades → factor = 0/10 = 0 → fitness * 0 = 0
+        return_pct=0.0, maxdd=0.0,
+        sharpe=0.0, pf=0.0, gross_profit=0, gross_loss=0
+    )
+    
+    fitness = calculate_fitness(
+        params=params,
+        metrics_sub=metrics_sub,
+        metrics_val=metrics_val,
+        param_space=space
+    )
+    
+    assert fitness != float('-inf')
+    assert fitness == 0.0
 
 
 def test_calculate_fitness_hard_fail_high_val_dd():

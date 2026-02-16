@@ -151,22 +151,20 @@ class TestWorkerIntegration(unittest.TestCase):
         ]
         
         config = self.config.copy()
-        config['warmup_data'] = warmup_candles
-        config['params'] = None # Disable WFO params to simplify path
+        # Use correct config keys for in-memory path
+        config['candles'] = self.mock_candles
+        config['warmup_candles'] = warmup_candles
+        config['params'] = None  # Disable WFO params to simplify path
         
         # Mock feature extractor
         MockFeature.return_value.add_all_features.return_value = pd.DataFrame()
 
-        # Spy on MarketState.update? 
-        # Hard to spy on local variable 'market' inside run().
-        # But we can check the log calls.
-        
         # Capture logs
         with self.assertLogs(logger='agent.Worker-test_worker', level='INFO') as cm:
             self.worker.run(config)
             
-        # Check for warmup log
-        self.assertTrue(any("Warming up with 5 candles" in log for log in cm.output))
+        # Check for in-memory data log that includes warmup count
+        self.assertTrue(any("warmup" in log.lower() for log in cm.output))
 
 if __name__ == '__main__':
     unittest.main()

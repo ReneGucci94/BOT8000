@@ -42,11 +42,17 @@ class TradeExecutor:
         """
         balance = self.broker.get_balance()
         
+        # Risk Overlay metrics
+        current_open_risk = self.broker.get_open_risk()
+        current_dd_pct = self.broker.get_current_drawdown_pct()
+        
         try:
             quantity = self.risk_manager.calculate_position_size(
                 account_balance=balance,
                 entry_price=signal.entry_price,
-                stop_loss=signal.stop_loss
+                stop_loss=signal.stop_loss,
+                current_open_risk=current_open_risk,
+                current_drawdown_pct=current_dd_pct
             )
         except ValueError as e:
             # Handle invalid stops or zero division

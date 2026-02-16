@@ -1,0 +1,210 @@
+# BOT8000 - Arquitectura del Sistema
+
+## Visión General
+
+BOT8000 es un sistema de trading algorítmico multi-agente construido con arquitectura de microservicios. El sistema está diseñado para operar 24/7 de forma autónoma, con capacidades de auto-reparación y aprendizaje continuo.
+
+## Componentes Principales
+
+### 1. MSC Layer 1 - Orquestación
+
+**OrchestratorAgent** (`src/agents/orchestrator.py`)
+- Coordina los 6 agentes especializados
+- Gestiona el ciclo de vida del sistema
+- Monitorea métricas en tiempo real
+- Implementa circuit breakers automáticos
+
+**Flujo de trabajo:**
+1. Recibir datos de mercado (cada timeframe)
+2. Clasificar régimen de mercado
+3. Activar agentes relevantes según régimen
+4. Combinar señales de alphas
+5. Validar con gestión de riesgo
+6. Ejecutar orden si pasa filtros
+7. Loggear resultados
+
+### 2. MSC Layer 2 - Agentes Especializados
+
+Cada agente es una instancia de `TradingAgent` con:
+- Pesos de alphas personalizados
+- Regímenes de mercado objetivo
+- Lógica de entrada/salida específica
+
+**Agentes:**
+1. **TrendHunterAgent** - Captura tendencias fuertes
+2. **MeanReversionAgent** - Opera rangos laterales
+3. **BreakoutHunterAgent** - Detecta rupturas
+4. **VolatilityFilterAgent** - Protege en alta vol
+5. **SentimentScoutAgent** - Análisis de sentimiento
+6. **LiquiditySurferAgent** - Opera en liquidez
+
+### 3. Alphas Layer - Señales
+
+**AlphaCombiner** (`src/alphas/combiner.py`)
+Combina múltiples señales usando media ponderada:
+```
+Score Final = Σ(Score_Alpha * Peso_Alpha) / Σ|Pesos|
+```
+
+**Alphas disponibles:**
+- **Alpha_OB_Quality:** Calidad de Order Blocks
+- **Alpha_Momentum:** Fuerza de tendencia (ADX)
+- **Alpha_Volatility:** Expansión/contracción de vol
+- **Alpha_ML_Confidence:** Confianza de modelo ML
+- **Alpha_Liquidity:** Análisis de liquidez
+
+### 4. Execution Layer
+
+**RiskManager** (`src/execution/risk.py`)
+- Kelly Criterion (1/4 Kelly conservador)
+- Value at Risk (VaR 95%/99%)
+- Expected Shortfall (CVaR)
+- Monte Carlo simulation
+- Stress testing
+
+**OrderExecutor** (`src/execution/executor.py`)
+- Gestión de órdenes
+- Slippage tracking
+- Manejo de errores
+- Retry logic
+
+### 5. Data Layer
+
+**PostgreSQL** con modelos:
+- `Trade` - Historial de trades
+- `Strategy` - Estrategias y parámetros
+- `Pattern` - Patrones ML detectados
+- `BacktestRun` - Resultados de backtests
+- `AgentLog` - Logs de agentes
+
+## Flujo de Datos
+
+```
+Market Data (API Exchange)
+    ↓
+Data Ingestion (src/data/)
+    ↓
+Market State (src/core/market.py)
+    ↓
+Regime Classifier (src/core/classifier.py)
+    ↓
+Orchestrator
+    ↓
+Active Agents (1-6 según régimen)
+    ↓
+Alpha Combiner
+    ↓
+Risk Manager
+    ↓
+Order Executor
+    ↓
+Exchange API
+    ↓
+PostgreSQL (logging)
+```
+
+## Tecnologías
+
+### Core
+- **Python 3.10+** - Lenguaje principal
+- **FastAPI** - API REST
+- **SQLAlchemy 2.0** - ORM
+- **PostgreSQL** - Base de datos
+- **Docker** - Containerización
+
+### ML/Data
+- **scikit-learn** - Modelos ML
+- **pandas** - Manipulación de datos
+- **numpy** - Computación numérica
+- **ta-lib** - Indicadores técnicos
+
+### Infraestructura (GCP)
+- **Cloud Run** - Servidor para bot
+- **Cloud Functions** - Cron jobs
+- **Pub/Sub** - Eventos en tiempo real
+- **Cloud Storage** - Backups
+- **Secret Manager** - Credenciales
+- **Cloud Logging** - Monitoreo
+
+## Patrones de Diseño
+
+### 1. Strategy Pattern
+Los agentes implementan `TradingAgent` base con:
+- `generate_signal()` - Lógica de señal
+- `should_trade()` - Filtros de régimen
+- `get_weights()` - Pesos de alphas
+
+### 2. Observer Pattern
+Eventos del sistema:
+- `on_trade_executed`
+- `on_regime_changed`
+- `on_drawdown_threshold`
+- `on_error`
+
+### 3. Circuit Breaker
+Protección contra fallos en cascada:
+- Drawdown > 5% → Pausa 1h
+- Drawdown > 10% → Pausa 4h
+- Drawdown > 15% → Stop 24h
+
+## Seguridad
+
+### Credenciales
+- **Desarrollo:** Variables de entorno
+- **Producción:** Google Secret Manager
+- **Rotación:** Automática cada 90 días
+
+### Validación
+- Inputs SQL sanitizados
+- Rate limiting en API
+- Autenticación JWT para endpoints sensibles
+
+## Escalabilidad
+
+### Horizontal
+- Múltiples instancias de agentes
+- Load balancing en Cloud Run
+- Pub/Sub para distribución de eventos
+
+### Vertical
+- Auto-scaling de Cloud Run (0-1000 instancias)
+- Connection pooling en PostgreSQL
+- Caching de datos de mercado
+
+## Monitoreo
+
+### Métricas clave
+- Win Rate, Profit Factor, Drawdown
+- Latencia de señales
+- Uso de recursos (CPU/RAM)
+- Errores por minuto
+
+### Alertas
+- Pérdida inesperada
+- Latencia alta
+- Errores críticos
+- Drawdown > umbral
+
+## CI/CD
+
+### Pipeline
+1. Push a GitHub
+2. Tests automáticos (pytest)
+3. Build Docker image
+4. Deploy a Cloud Run (staging)
+5. Pruebas de integración
+6. Deploy a producción
+
+### Environments
+- **Local:** Docker Compose
+- **Staging:** Cloud Run (simulador)
+- **Production:** Cloud Run (paper/live)
+
+## Costos (Proyección)
+
+Con 22k créditos (~$300):
+- Cloud Run: $30/mes
+- Cloud Functions: $0.50/mes
+- Cloud Storage: $2.50/mes
+- Secret Manager: $0.30/mes
+- **Total:** ~$35/mes = **9 meses**

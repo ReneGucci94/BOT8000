@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, List, Callable, Optional, Tuple
 import random
 import copy
+import math
 from src.optimization.param_space import ParamSpace, ParamType
 from src.optimization.constraints import project_constraints
 
@@ -275,7 +276,8 @@ class GeneticAlgorithm:
         
         # Stats Gen 0
         current_best = max(population, key=lambda ind: ind.fitness if ind.fitness is not None else float('-inf'))
-        avg_fitness = sum(ind.fitness for ind in population if ind.fitness is not None) / len(population)
+        finite_fitnesses = [ind.fitness for ind in population if ind.fitness is not None and math.isfinite(ind.fitness)]
+        avg_fitness = sum(finite_fitnesses) / len(finite_fitnesses) if finite_fitnesses else float('-inf')
         
         best_ever = copy.deepcopy(current_best)
         
@@ -285,6 +287,10 @@ class GeneticAlgorithm:
             "avg_fitness": avg_fitness,
             "evaluations": evaluations_count
         })
+        
+        best_str = f"{current_best.fitness:.4f}" if math.isfinite(current_best.fitness) else "-inf"
+        avg_str = f"{avg_fitness:.4f}" if math.isfinite(avg_fitness) else "-inf"
+        print(f"Generation 0: Best Fitness={best_str}, Avg={avg_str}")
         
         generations_without_improvement = 0
         
@@ -337,7 +343,8 @@ class GeneticAlgorithm:
             
             # A) Stats de la NUEVA población
             current_best = max(population, key=lambda ind: ind.fitness if ind.fitness is not None else float('-inf'))
-            avg_fitness = sum(ind.fitness for ind in population if ind.fitness is not None) / len(population)
+            finite_fitnesses = [ind.fitness for ind in population if ind.fitness is not None and math.isfinite(ind.fitness)]
+            avg_fitness = sum(finite_fitnesses) / len(finite_fitnesses) if finite_fitnesses else float('-inf')
             
             history.append({
                 "gen": gen,
@@ -345,6 +352,10 @@ class GeneticAlgorithm:
                 "avg_fitness": avg_fitness,
                 "evaluations": evaluations_count
             })
+            
+            best_str = f"{current_best.fitness:.4f}" if math.isfinite(current_best.fitness) else "-inf"
+            avg_str = f"{avg_fitness:.4f}" if math.isfinite(avg_fitness) else "-inf"
+            print(f"Generation {gen}: Best Fitness={best_str}, Avg={avg_str}")
             
             # B) Early Stopping Check & Updates
             if current_best.fitness > best_ever.fitness:

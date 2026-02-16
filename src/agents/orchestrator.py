@@ -121,3 +121,6 @@ class MSCOrchestrator:
             })
             
         return signal
+
+# Backward-compatible alias
+OrchestratorAgent = MSCOrchestrator

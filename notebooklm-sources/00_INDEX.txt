@@ -1,0 +1,124 @@
+# BOT8000 Trading Bot - Notebook LM Source Index
+================================================================================
+
+Total Python files: 80
+Consolidated into: 1 chunks
+Max words per chunk: 450,000
+
+## Directory Structure:
+
+
+### .agent/
+  - auditor.py
+
+### root/
+  - consolidate_for_notebooklm.py
+  - debug_pipeline.py
+  - find_w1.py
+  - verify_results_integrity.py
+
+### scripts/
+  - analyze_top_3.py
+  - dashboard_wfo.py
+  - download_may_data.py
+  - get_telegram_chatid.py
+  - migrate_add_symbol.py
+  - monitor_wfo.py
+  - optimizer.py
+  - run_backtest.py
+  - run_multi_month_backtest.py
+  - run_oos_validation.py
+  ... and 6 more files
+
+### src/agents/
+  - __init__.py
+  - base.py
+  - breakout_hunter.py
+  - data_agent.py
+  - mean_reversion.py
+  - optimizer_swarm.py
+  - orchestrator.py
+  - pattern_detective.py
+  - sentiment_scout.py
+  - strategy_mutator.py
+  ... and 6 more files
+
+### src/alphas/
+  - base.py
+  - combiner.py
+  - liquidity.py
+  - ml_confidence.py
+  - momentum.py
+  - ob_quality.py
+  - volatility.py
+
+### src/api/
+  - main.py
+
+### src/core/
+  - candle.py
+  - classifier.py
+  - market.py
+  - regime.py
+  - series.py
+  - timeframe.py
+  - types.py
+
+### src/data/
+  - downloader.py
+
+### src/database/
+  - __init__.py
+  - connection.py
+  - models.py
+  - repository.py
+
+### src/execution/
+  - broker.py
+  - executor.py
+  - risk.py
+
+### src/ml/
+  - analyzer.py
+  - features.py
+
+### src/optimization/
+  - analyzer.py
+  - constraints.py
+  - engine.py
+  - fitness.py
+  - genetic_algorithm.py
+  - param_space.py
+  - types.py
+  - windows.py
+
+### src/portfolio/
+  - correlation.py
+
+### src/simulation/
+  - backtest.py
+  - broker.py
+  - generator.py
+
+### src/strategy/
+  - engine.py
+  - fractals.py
+  - fvg.py
+  - ob.py
+  - structure.py
+
+### src/utils/
+  - data_loader.py
+
+
+## Key Components:
+
+- src/agents/ - Trading agents (Trend Hunter, Mean Reversion, etc.)
+- src/core/ - Core logic (Orchestrator, Market State)
+- src/execution/ - Order execution and risk management
+- src/alphas/ - Alpha signal generators
+- src/strategy/ - Trading strategies
+- src/database/ - Database models and connection
+- src/optimization/ - Genetic Algorithm and WFO
+- src/api/ - FastAPI REST API
+- src/ml/ - Machine learning components

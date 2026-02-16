@@ -1,0 +1,260 @@
+# BOT8000 - FAQ y Solución de Problemas
+
+## Preguntas Frecuentes
+
+### ¿Cuál es la diferencia entre modos de operación?
+
+**SIMULATION (Simulador):**
+- Usa datos históricos
+- No conecta a exchange real
+- Para desarrollo y testing
+- Sin riesgo de dinero real
+
+**PAPER (Paper Trading):**
+- Conecta a exchange real
+- Opera con dinero ficticio
+- Ejecuta órdenes en mercado real
+- Validación antes de live
+
+**LIVE (Trading Real):**
+- Opera con dinero real
+- Riesgo de pérdida real
+- Requiere validación exhaustiva
+- Solo después de paper trading exitoso
+
+### ¿Qué significan las métricas principales?
+
+**Win Rate:** % de trades ganadores
+- Objetivo: > 55%
+- Fórmula: Ganadores / Total Trades
+
+**Profit Factor:** Eficiencia del sistema
+- Objetivo: > 1.2
+- Fórmula: Ganancias brutas / Pérdidas brutas
+
+**Max Drawdown:** Caída máxima desde pico
+- Objetivo: < 15%
+- Mide pérdida máxima en período
+
+**Sharpe Ratio:** Rendimiento ajustado por riesgo
+- Objetivo: > 1.0
+- Mayor = mejor rendimiento relativo al riesgo
+
+**Recovery Factor:** Capacidad de recuperación
+- Fórmula: Profit Neto / Max Drawdown
+- Objetivo: > 2.0
+
+### ¿Cómo funciona el Kelly Criterion?
+
+El bot usa **1/4 Kelly conservador**:
+```
+Tamaño de posición = (Win% - Loss%) / (Avg Win / Avg Loss) * 0.25
+```
+
+Ejemplo:
+- Win Rate: 58%
+- Avg Win: $150
+- Avg Loss: $100
+- Kelly Full: (0.58 - 0.42) / (150/100) = 0.11 (11%)
+- Kelly 1/4: 11% * 0.25 = 2.75% del capital por trade
+
+### ¿Qué es Walk Forward Optimization (WFO)?
+
+Técnica para evitar overfitting:
+1. Dividir datos en ventanas (ej: 6 meses)
+2. Optimizar en ventana 1 (in-sample)
+3. Validar en ventana 2 (out-of-sample)
+4. Avanzar ventana y repetir
+5. Promediar resultados de todas las ventanas
+
+**Importante:** El bot solo aprueba estrategias con WFO válido.
+
+### ¿Por qué el bot no opera en alta volatilidad?
+
+El **VolatilityFilterAgent** reduce exposición cuando:
+- ATR se expande > 2 desviaciones estándar
+- VIX equivalente > 30
+- Rupturas de gaps > 3%
+
+**Razón:** En alta volatilidad:
+- Stop losses se activan fácilmente
+- Slippage aumenta
+- Modelos estadísticos fallan
+
+### ¿Qué pasa si el bot pierde conexión?
+
+**Circuitos de seguridad:**
+1. Si desconexión > 5 min: Pausar nuevas entradas
+2. Si desconexión > 15 min: Cerrar posiciones abiertas
+3. Si desconexión > 30 min: Alerta crítica + notificación
+
+**Configuración:**
+- Reconexión automática cada 30 segundos
+- Retry logic con backoff exponencial
+- Logs de todas las desconexiones
+
+### ¿Cómo actualizar el bot?
+
+**Proceso seguro:**
+1. Detener bot: `docker-compose stop bot8000`
+2. Backup DB: `pg_dump ... > backup.sql`
+3. Pull código: `git pull origin main`
+4. Rebuild: `docker-compose up -d --build`
+5. Verificar: `docker logs bot8000 | tail -20`
+6. Monitorear métricas por 1h
+
+**Rollback:**
+```bash
+git checkout <version-anterior>
+docker-compose up -d --build
+```
+
+### ¿Cuánto dinero necesito para empezar?
+
+**Recomendaciones por modo:**
+
+**Simulador:** $0 (usa datos históricos)
+
+**Paper Trading:** $0 (dinero ficticio)
+
+**Live Trading:**
+- Mínimo: $1,000 (para diversificar)
+- Recomendado: $5,000 - $10,000
+- Óptimo: $25,000+ (para position sizing adecuado)
+
+**Consideraciones:**
+- Comisiones exchange: 0.1% - 0.2%
+- Spread y slippage: ~0.05%
+- Costo operativo GCP: ~$35/mes
+
+### ¿Puedo usar el bot en otros exchanges?
+
+**Actualmente soportado:**
+- Binance (spot y futures)
+- Bybit (futures)
+
+**Para añadir nuevo exchange:**
+1. Crear clase en `src/exchange/`
+2. Implementar interfaz `BaseExchange`
+3. Añadir tests de integración
+4. Validar con paper trading
+
+**Tiempo estimado:** 2-4 días de desarrollo
+
+### ¿Qué datos necesita el bot?
+
+**Mínimo:**
+- OHLCV (Open, High, Low, Close, Volume)
+- Timeframe: 1h o 4h recomendado
+
+**Óptimo:**
+- Datos de funding rates
+- Métricas on-chain
+- Sentimiento de mercado
+- Order book depth
+
+**Fuentes:**
+- Binance API (gratis)
+- CryptoCompare (gratis)
+- Glassnode (de pago, opcional)
+
+### ¿Cómo sé si el bot está funcionando bien?
+
+**Indicadores de salud:**
+
+✅ **Buen estado:**
+- API responde < 200ms
+- Sin errores en logs por > 1h
+- Win Rate últimos 30 trades > 50%
+- Drawdown < 10%
+- PostgreSQL healthy
+
+⚠️ **Atención requerida:**
+- Latencia > 500ms
+- Errores esporádicos
+- Win Rate < 50% en últimos 20 trades
+- Drawdown 10-15%
+
+🔴 **Problema crítico:**
+- API no responde
+- Errores continuos
+- Drawdown > 15%
+- Pérdida de conexión a DB
+
+**Monitoreo:**
+- Dashboard: http://34.55.73.193:8000
+- Logs: `docker logs -f bot8000`
+- Métricas: `bot8000 status`
+
+### ¿El bot trabaja los fines de semana?
+
+**Crypto markets:** 24/7/365
+- Bot opera continuamente
+- Sin pausas programadas
+- Excepto durante mantenimiento
+
+**Mantenimiento:**
+- Domingos 3-4 AM UTC (menor volatilidad)
+- < 30 minutos
+- Anuncio previo 24h
+
+### ¿Qué hago si el bot pierde dinero?
+
+**Paso 1:** Verificar modo de operación
+```bash
+# Confirmar que está en paper, no live
+curl http://localhost:8000/api/config
+```
+
+**Paso 2:** Revisar métricas
+```bash
+bot8000 metrics --period 7d
+```
+
+**Paso 3:** Analizar logs
+```bash
+docker logs bot8000 | grep -i error
+```
+
+**Paso 4:** Acciones según problema:
+- Drawdown alto → Circuit breaker activado automático
+- Win Rate bajo → Revisar configuración de estrategia
+- Errores técnicos → Reiniciar bot
+
+**Paso 5:** Si persiste:
+- Pausar bot: `docker-compose stop bot8000`
+- Contactar soporte
+- Revisar con Notebook LM: "Analizar últimos 30 trades"
+
+### ¿Puedo modificar el código?
+
+**Sí, con precauciones:**
+
+✅ **Seguro modificar:**
+- Configuraciones (YAML)
+- Parámetros de riesgo (con validación)
+- Logs y métricas
+- Documentación
+
+⚠️ **Requiere testing:**
+- Lógica de agentes
+- Alphas y señales
+- Gestión de órdenes
+
+🔴 **No tocar sin consultar:**
+- `risk.py` (gestión de riesgo)
+- `executor.py` (ejecución)
+- Circuit breakers
+
+**Proceso:**
+1. Crear branch: `git checkout -b feature/nueva-funcionalidad`
+2. Hacer cambios
+3. Tests: `pytest`
+4. Backtest: `bot8000 backtest --days 30`
+5. PR con revisión
+
+## Contacto y Soporte
+
+- **GitHub Issues:** https://github.com/ReneGucci94/BOT8000/issues
+- **Documentación:** http://34.55.73.193:8000/docs
+- **Reporte Ejecutivo:** Ver `docs/BOT8000-Executive-Report.pdf`

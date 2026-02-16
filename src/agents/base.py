@@ -20,6 +20,7 @@ class BaseAgent(ABC):
         self.started_at: Optional[datetime] = None
         self.completed_at: Optional[datetime] = None
         self.error: Optional[str] = None
+        self._db_enabled = True
         
         # Setup logging
         self.logger = logging.getLogger(f"agent.{agent_name}")
@@ -27,13 +28,14 @@ class BaseAgent(ABC):
     
     def _setup_logging(self):
         """Configurar logging del agente"""
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            f'[{self.agent_name}] %(asctime)s - %(levelname)s - %(message)s'
-        )
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
-        self.logger.setLevel(logging.INFO)
+        if not self.logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter(
+                f'[{self.agent_name}] %(asctime)s - %(levelname)s - %(message)s'
+            )
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+            self.logger.setLevel(logging.INFO)
     
     def log(self, level: str, message: str, context: Optional[Dict[str, Any]] = None):
         """Log con persistencia en DB"""
@@ -42,11 +44,14 @@ class BaseAgent(ABC):
         log_method(message)
         
         # Log a DB
-        try:
-            with get_db_session() as db:
-                AgentLogRepository.log(db, self.agent_name, level.upper(), message, context)
-        except Exception as e:
-            self.logger.error(f"Error logging to DB: {e}")
+        # Log a DB
+        if self._db_enabled:
+            try:
+                with get_db_session() as db:
+                    AgentLogRepository.log(db, self.agent_name, level.upper(), message, context)
+            except Exception as e:
+                self._db_enabled = False
+                self.logger.warning(f"DB Logging disabled due to error: {e}")
     
     def update_progress(self, current: int, total: int, message: str):
         """Actualizar progreso del agente"""
